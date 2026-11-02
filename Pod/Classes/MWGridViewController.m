@@ -26,26 +26,26 @@
     if ((self = [super initWithCollectionViewLayout:[UICollectionViewFlowLayout new]])) {
         
         // Defaults
-        _columns = 3, _columnsL = 4;
-        _margin = 0, _gutter = 1;
-        _marginL = 0, _gutterL = 1;
+        _columns = 3; _columnsL = 4;
+        _margin = 0; _gutter = 1;
+        _marginL = 0; _gutterL = 1;
         
         // For pixel perfection...
-        if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
             // iPad
-            _columns = 6, _columnsL = 8;
-            _margin = 1, _gutter = 2;
-            _marginL = 1, _gutterL = 2;
+            _columns = 6; _columnsL = 8;
+            _margin = 1; _gutter = 2;
+            _marginL = 1; _gutterL = 2;
         } else if ([UIScreen mainScreen].bounds.size.height == 480) {
             // iPhone 3.5 inch
-            _columns = 3, _columnsL = 4;
-            _margin = 0, _gutter = 1;
-            _marginL = 1, _gutterL = 2;
+            _columns = 3; _columnsL = 4;
+            _margin = 0; _gutter = 1;
+            _marginL = 1; _gutterL = 2;
         } else {
             // iPhone 4 inch
-            _columns = 3, _columnsL = 5;
-            _margin = 0, _gutter = 1;
-            _marginL = 0, _gutterL = 2;
+            _columns = 3; _columnsL = 5;
+            _margin = 0; _gutter = 1;
+            _marginL = 0; _gutterL = 2;
         }
 
         _initialContentOffset = CGPointMake(0, CGFLOAT_MAX);
@@ -110,19 +110,35 @@
 }
 
 - (void)performLayout {
-    UINavigationBar *navBar = self.navigationController.navigationBar;
-    self.collectionView.contentInset = UIEdgeInsetsMake(navBar.frame.origin.y + navBar.frame.size.height + [self getGutter], 0, 0, 0);
+//    UINavigationBar *navBar = self.navigationController.navigationBar;
+//    self.collectionView.contentInset = UIEdgeInsetsMake(navBar.frame.origin.y + navBar.frame.size.height + [self getGutter], 0, 0, 0);
 }
 
-- (void)willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+//- (void)willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+//    [self.collectionView reloadData];
+//    [self performLayout]; // needed for iOS 5 & 6
+//}
+
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id <UIViewControllerTransitionCoordinator>)coordinator {
     [self.collectionView reloadData];
-    [self performLayout]; // needed for iOS 5 & 6
+    [self performLayout]; // needed for iOS 8
 }
 
 #pragma mark - Layout
 
+/// 当前是否为竖屏，替代已废弃的 self.interfaceOrientation（iOS 8 废弃）
+- (BOOL)mw_isPortrait {
+    // 优先从 windowScene 获取当前方向（iOS 13+）
+    UIWindowScene *windowScene = self.view.window.windowScene;
+    if (windowScene) {
+        return UIInterfaceOrientationIsPortrait(windowScene.interfaceOrientation);
+    }
+    // 视图尚未挂到 window 时按 bounds 尺寸兜底
+    return self.view.bounds.size.height >= self.view.bounds.size.width;
+}
+
 - (CGFloat)getColumns {
-    if ((UIInterfaceOrientationIsPortrait(self.interfaceOrientation))) {
+    if ([self mw_isPortrait]) {
         return _columns;
     } else {
         return _columnsL;
@@ -130,7 +146,7 @@
 }
 
 - (CGFloat)getMargin {
-    if ((UIInterfaceOrientationIsPortrait(self.interfaceOrientation))) {
+    if ([self mw_isPortrait]) {
         return _margin;
     } else {
         return _marginL;
@@ -138,7 +154,7 @@
 }
 
 - (CGFloat)getGutter {
-    if ((UIInterfaceOrientationIsPortrait(self.interfaceOrientation))) {
+    if ([self mw_isPortrait]) {
         return _gutter;
     } else {
         return _gutterL;

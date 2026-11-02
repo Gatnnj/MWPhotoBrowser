@@ -22,7 +22,7 @@
     "tag": "2.1.2"
   },
   "platforms": {
-    "ios": "7.0"
+    "ios": "15.0"
   },
   "source_files": "Pod/Classes/**/*",
   "resource_bundles": {
@@ -34,10 +34,10 @@
   "frameworks": [
     "ImageIO",
     "QuartzCore",
-    "AssetsLibrary",
-    "MediaPlayer"
+    "AVKit",
+    "AVFoundation",
+    "Photos"
   ],
-  "weak_frameworks": "Photos",
   "dependencies": {
     "MBProgressHUD": [
       "~> 0.9"

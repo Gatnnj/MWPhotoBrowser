@@ -201,7 +201,8 @@
         id <MWPhoto> photoWithProgress = [dict objectForKey:@"photo"];
         if (photoWithProgress == self.photo) {
             float progress = [[dict valueForKey:@"progress"] floatValue];
-            _loadingIndicator.progress = MAX(MIN(1, progress), 0);
+            // 显式 self 消除 block 隐式 retain 警告
+            self->_loadingIndicator.progress = MAX(MIN(1, progress), 0);
         }
     });
 }
@@ -265,7 +266,7 @@
     
     // Calculate Max
     CGFloat maxScale = 3;
-    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
         // Let them go a bit bigger on a bigger screen!
         maxScale = 4;
     }
@@ -378,7 +379,12 @@
 #pragma mark - Tap Detection
 
 - (void)handleSingleTap:(CGPoint)touchPoint {
-	[_photoBrowser performSelector:@selector(toggleControls) withObject:nil afterDelay:0.2];
+    // 旧实现 performSelector:afterDelay: 替换为 GCD，保持 0.2 秒延迟后切换控件显隐
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        // 显式 self 消除 block 隐式 retain 警告
+        [self->_photoBrowser toggleControls];
+    });
 }
 
 - (void)handleDoubleTap:(CGPoint)touchPoint {

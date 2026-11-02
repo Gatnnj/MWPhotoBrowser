@@ -11,7 +11,8 @@
 #else
 #import "SDWebImage.h"
 #endif
-#import <AssetsLibrary/AssetsLibrary.h>
+// AssetsLibrary（iOS 9 废弃）替换为 Photos 框架
+#import <Photos/Photos.h>
 #import "MWPhoto.h"
 #import "MWPhotoBrowser.h"
 
@@ -228,33 +229,13 @@
             if (error) {
                 MWLog(@"SDWebImage failed to download image: %@", error);
             }
-            _webImageOperation = nil;
+            // 显式 self 表明 block 有意引用，消除隐式 retain 警告（该 block 为一次性回调，无循环引用）
+            self->_webImageOperation = nil;
             self.underlyingImage = image;
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self imageLoadingComplete];
             });
         }];
-//        _webImageOperation = [manager downloadImageWithURL:url
-//                                                   options:0
-//                                                  progress:^(NSInteger receivedSize, NSInteger expectedSize) {
-//                                                      if (expectedSize > 0) {
-//                                                          float progress = receivedSize / (float)expectedSize;
-//                                                          NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys:
-//                                                                                [NSNumber numberWithFloat:progress], @"progress",
-//                                                                                self, @"photo", nil];
-//                                                          [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:dict];
-//                                                      }
-//                                                  }
-//                                                 completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, BOOL finished, NSURL *imageURL) {
-//                                                     if (error) {
-//                                                         MWLog(@"SDWebImage failed to download image: %@", error);
-//                                                     }
-//                                                     _webImageOperation = nil;
-//                                                     self.underlyingImage = image;
-//                                                     dispatch_async(dispatch_get_main_queue(), ^{
-//                                                         [self imageLoadingComplete];
-//                                                     });
-//                                                 }];
     } @catch (NSException *e) {
         MWLog(@"Photo from web: %@", e);
         _webImageOperation = nil;
@@ -268,42 +249,72 @@
         @autoreleasepool {
             @try {
                 self.underlyingImage = [UIImage imageWithContentsOfFile:url.path];
-                if (!_underlyingImage) {
+                // 显式 self 表明 block 有意引用，消除隐式 retain 警告
+                if (!self.underlyingImage) {
                     MWLog(@"Error loading photo from path: %@", url.path);
                 }
             } @finally {
-                [self performSelectorOnMainThread:@selector(imageLoadingComplete) withObject:nil waitUntilDone:NO];
+                // 回到主线程回调，等价于 performSelectorOnMainThread:waitUntilDone:NO
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self imageLoadingComplete];
+                });
             }
         }
     });
 }
 
 // Load from asset library async
+// 旧的 ALAssetsLibrary（iOS 9 废弃）替换为 Photos 框架：
+// 先通过 Apple 官方的 ALAsset URL 桥接方法查出 PHAsset，再由 PHImageManager 加载全屏图
 - (void)_performLoadUnderlyingImageAndNotifyWithAssetsLibraryURL:(NSURL *)url {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        @autoreleasepool {
-            @try {
-                ALAssetsLibrary *assetslibrary = [[ALAssetsLibrary alloc] init];
-                [assetslibrary assetForURL:url
-                               resultBlock:^(ALAsset *asset){
-                                   ALAssetRepresentation *rep = [asset defaultRepresentation];
-                                   CGImageRef iref = [rep fullScreenImage];
-                                   if (iref) {
-                                       self.underlyingImage = [UIImage imageWithCGImage:iref];
-                                   }
-                                   [self performSelectorOnMainThread:@selector(imageLoadingComplete) withObject:nil waitUntilDone:NO];
-                               }
-                              failureBlock:^(NSError *error) {
-                                  self.underlyingImage = nil;
-                                  MWLog(@"Photo from asset library error: %@",error);
-                                  [self performSelectorOnMainThread:@selector(imageLoadingComplete) withObject:nil waitUntilDone:NO];
-                              }];
-            } @catch (NSException *e) {
-                MWLog(@"Photo from asset library error: %@", e);
-                [self performSelectorOnMainThread:@selector(imageLoadingComplete) withObject:nil waitUntilDone:NO];
-            }
+    @try {
+        // 根据旧 assets-library URL 查找对应的 PHAsset（官方桥接 API）
+        // 该桥接方法自 iOS 11 被标记废弃，但它是消费旧 assets-library URL 的唯一途径，
+        // 且当前系统仍可正常工作，因此局部抑制此废弃警告
+        PHFetchResult<PHAsset *> *fetchResult;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        fetchResult = [PHAsset fetchAssetsWithALAssetURLs:@[url] options:nil];
+#pragma clang diagnostic pop
+        PHAsset *asset = fetchResult.firstObject;
+        if (!asset) {
+            // 未找到资源，等价旧 failureBlock 分支
+            self.underlyingImage = nil;
+            MWLog(@"Photo from asset library error: asset not found");
+            [self imageLoadingComplete];
+            return;
         }
-    });
+
+        // 请求全屏高质量图片，等价旧 ALAssetRepresentation.fullScreenImage
+        PHImageRequestOptions *options = [PHImageRequestOptions new];
+        options.networkAccessAllowed = YES;
+        options.resizeMode = PHImageRequestOptionsResizeModeExact;
+        options.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
+
+        [[PHImageManager defaultManager] requestImageForAsset:asset
+                                                    targetSize:PHImageManagerMaximumSize
+                                                   contentMode:PHImageContentModeDefault
+                                                       options:options
+                                                 resultHandler:^(UIImage *result, NSDictionary *info) {
+            // 忽略中间的降级缩略图，只在最终结果时完成加载
+            if ([info[PHImageResultIsDegradedKey] boolValue]) return;
+
+            NSError *error = info[PHImageErrorKey];
+            if (error) {
+                self.underlyingImage = nil;
+                MWLog(@"Photo from asset library error: %@", error);
+            } else {
+                self.underlyingImage = result;
+            }
+            // resultHandler 默认在主线程回调，直接执行完成处理
+            [self imageLoadingComplete];
+        }];
+    } @catch (NSException *e) {
+        MWLog(@"Photo from asset library error: %@", e);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self imageLoadingComplete];
+        });
+    }
 }
 
 // Load from photos library
@@ -343,7 +354,10 @@
     // Complete so notify
     _loadingInProgress = NO;
     // Notify on next run loop
-    [self performSelector:@selector(postCompleteNotification) withObject:nil afterDelay:0];
+    // dispatch_after 延迟 0 等价于 performSelector:afterDelay:0，均在下一次 runloop 执行
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0), dispatch_get_main_queue(), ^{
+        [self postCompleteNotification];
+    });
 }
 
 - (void)postCompleteNotification {

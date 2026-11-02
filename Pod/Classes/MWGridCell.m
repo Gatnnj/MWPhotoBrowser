@@ -54,7 +54,7 @@
         // Selection button
         _selectedButton = [UIButton buttonWithType:UIButtonTypeCustom];
         _selectedButton.contentMode = UIViewContentModeTopRight;
-        _selectedButton.adjustsImageWhenHighlighted = NO;
+        // adjustsImageWhenHighlighted（iOS 15 废弃）已移除：该属性默认值即为 NO，删除后行为完全等价
         [_selectedButton setImage:[UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/ImageSelectedSmallOff" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]] forState:UIControlStateNormal];
         [_selectedButton setImage:[UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/ImageSelectedSmallOn" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]] forState:UIControlStateSelected];
         [_selectedButton addTarget:self action:@selector(selectionButtonPressed) forControlEvents:UIControlEventTouchDown];
@@ -223,10 +223,11 @@
     dispatch_async(dispatch_get_main_queue(), ^{
         NSDictionary *dict = [notification object];
         id <MWPhoto> photoWithProgress = [dict objectForKey:@"photo"];
-        if (photoWithProgress == _photo) {
+        // 显式 self 消除 block 隐式 retain 警告
+        if (photoWithProgress == self->_photo) {
 //            NSLog(@"%f", [[dict valueForKey:@"progress"] floatValue]);
             float progress = [[dict valueForKey:@"progress"] floatValue];
-            _loadingIndicator.progress = MAX(MIN(1, progress), 0);
+            self->_loadingIndicator.progress = MAX(MIN(1, progress), 0);
         }
     });
 }

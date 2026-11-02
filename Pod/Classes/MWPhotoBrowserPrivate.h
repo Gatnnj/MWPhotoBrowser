@@ -8,12 +8,16 @@
 
 #import <UIKit/UIKit.h>
 #import <MBProgressHUD/MBProgressHUD.h>
-#import <MediaPlayer/MediaPlayer.h>
+// MediaPlayer 框架（MPMoviePlayerViewController，iOS 9 废弃）已移除，
+// 现代播放器 AVPlayerViewController 位于 AVKit，在 .m 中导入
 #import "MWGridViewController.h"
 #import "MWZoomingScrollView.h"
 
+@class AVPlayerViewController;
+
 // Declare private methods of browser
-@interface MWPhotoBrowser () {
+// 遵循 UIAdaptivePresentationControllerDelegate 以监听用户手动关闭播放器
+@interface MWPhotoBrowser () <UIAdaptivePresentationControllerDelegate> {
     
 	// Data
     NSUInteger _photoCount;
@@ -46,21 +50,22 @@
     BOOL _previousNavBarHidden;
     BOOL _previousNavBarTranslucent;
     UIBarStyle _previousNavBarStyle;
-    UIStatusBarStyle _previousStatusBarStyle;
+    // _previousStatusBarStyle 已移除：现代状态栏机制下无需手动保存/恢复样式
     UIColor *_previousNavBarTintColor;
     UIColor *_previousNavBarBarTintColor;
     UIBarButtonItem *_previousViewControllerBackButton;
     UIImage *_previousNavigationBarBackgroundImageDefault;
-    UIImage *_previousNavigationBarBackgroundImageLandscapePhone;
-    
+    // _previousNavigationBarBackgroundImageLandscapePhone 已移除：iOS 8 后横屏使用统一 metrics
+
     // Video
-    MPMoviePlayerViewController *_currentVideoPlayerViewController;
+    // 类型由 MPMoviePlayerViewController 替换为 AVPlayerViewController（AVKit）
+    AVPlayerViewController *_currentVideoPlayerViewController;
     NSUInteger _currentVideoIndex;
     UIActivityIndicatorView *_currentVideoLoadingIndicator;
     
     // Misc
     BOOL _hasBelongedToViewController;
-    BOOL _isVCBasedStatusBarAppearance;
+    // _isVCBasedStatusBarAppearance 已移除：iOS 13 起状态栏外观统一由 VC 管理
     BOOL _statusBarShouldBeHidden;
     BOOL _displayActionButton;
     BOOL _leaveStatusBarAlone;

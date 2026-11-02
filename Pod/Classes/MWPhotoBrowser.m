@@ -7,6 +7,9 @@
 //
 
 #import <QuartzCore/QuartzCore.h>
+// 现代视频播放器框架，替代已废弃的 MediaPlayer/MPMoviePlayerViewController
+#import <AVKit/AVKit.h>
+#import <AVFoundation/AVFoundation.h>
 #import "MWCommon.h"
 #import "MWPhotoBrowser.h"
 #import "MWPhotoBrowserPrivate.h"
@@ -50,14 +53,11 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 }
 
 - (void)_initialisation {
-    
-    // Defaults
-    NSNumber *isVCBasedStatusBarAppearanceNum = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UIViewControllerBasedStatusBarAppearance"];
-    if (isVCBasedStatusBarAppearanceNum) {
-        _isVCBasedStatusBarAppearance = isVCBasedStatusBarAppearanceNum.boolValue;
-    } else {
-        _isVCBasedStatusBarAppearance = YES; // default
-    }
+
+    // 旧的 UIViewControllerBasedStatusBarAppearance 判断已移除：
+    // iOS 13 起状态栏外观统一由视图控制器管理（本库下限 iOS 15），
+    // 不再存在非 VC based 的生效路径，相关逻辑由 preferredStatusBarStyle/
+    // prefersStatusBarHidden + setNeedsStatusBarAppearanceUpdate 实现
     self.hidesBottomBarWhenPushed = YES;
     _hasBelongedToViewController = NO;
     _photoCount = NSNotFound;
@@ -81,8 +81,9 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     _thumbPhotos = [[NSMutableArray alloc] init];
     _currentGridContentOffset = CGPointMake(0, CGFLOAT_MAX);
     _didSavePreviousStateOfNavBar = NO;
-    self.automaticallyAdjustsScrollViewInsets = NO;
-    
+    // 旧的 automaticallyAdjustsScrollViewInsets（iOS 11 废弃）已移除，
+    // 等价设置在 pagingScrollView 创建处通过 contentInsetAdjustmentBehavior 完成
+
     // Listen for MWPhoto notifications
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(handleMWPhotoLoadingDidEndNotification:)
@@ -150,6 +151,9 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	// Setup paging scrolling view
 	CGRect pagingScrollViewFrame = [self frameForPagingScrollView];
 	_pagingScrollView = [[UIScrollView alloc] initWithFrame:pagingScrollViewFrame];
+	// 等价于旧的 self.automaticallyAdjustsScrollViewInsets = NO，
+	// 明确禁止系统自动调整安全区 inset，保持现有手动布局不变
+	_pagingScrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
 	_pagingScrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 	_pagingScrollView.pagingEnabled = YES;
 	_pagingScrollView.delegate = self;
@@ -160,12 +164,14 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	[self.view addSubview:_pagingScrollView];
 	
     // Toolbar
-    _toolbar = [[UIToolbar alloc] initWithFrame:[self frameForToolbarAtOrientation:self.interfaceOrientation]];
+    _toolbar = [[UIToolbar alloc] initWithFrame:[self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]]];
     _toolbar.tintColor = [UIColor whiteColor];
     _toolbar.barTintColor = nil;
     [_toolbar setBackgroundImage:nil forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsDefault];
-    [_toolbar setBackgroundImage:nil forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsLandscapePhone];
-    _toolbar.barStyle = UIBarStyleBlackTranslucent;
+    // LandscapePhone metrics（iOS 8 废弃）已移除：现代系统横屏统一使用 Default metrics
+    // UIBarStyleBlackTranslucent（iOS 13 废弃）替换为 UIBarStyleBlack + 显式 translucent
+    _toolbar.barStyle = UIBarStyleBlack;
+    _toolbar.translucent = YES;
     _toolbar.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleWidth;
     
     // Toolbar Items
@@ -211,9 +217,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         _doneButton = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Done", nil) style:UIBarButtonItemStylePlain target:self action:@selector(doneButtonPressed:)];
         // Set appearance
         [_doneButton setBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
-        [_doneButton setBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsLandscapePhone];
         [_doneButton setBackgroundImage:nil forState:UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
-        [_doneButton setBackgroundImage:nil forState:UIControlStateHighlighted barMetrics:UIBarMetricsLandscapePhone];
         [_doneButton setTitleTextAttributes:[NSDictionary dictionary] forState:UIControlStateNormal];
         [_doneButton setTitleTextAttributes:[NSDictionary dictionary] forState:UIControlStateHighlighted];
         self.navigationItem.rightBarButtonItem = _doneButton;
@@ -224,9 +228,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         UIBarButtonItem *newBackButton = [[UIBarButtonItem alloc] initWithTitle:backButtonTitle style:UIBarButtonItemStylePlain target:nil action:nil];
         // Appearance
         [newBackButton setBackButtonBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
-        [newBackButton setBackButtonBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsLandscapePhone];
         [newBackButton setBackButtonBackgroundImage:nil forState:UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
-        [newBackButton setBackButtonBackgroundImage:nil forState:UIControlStateHighlighted barMetrics:UIBarMetricsLandscapePhone];
         [newBackButton setTitleTextAttributes:[NSDictionary dictionary] forState:UIControlStateNormal];
         [newBackButton setTitleTextAttributes:[NSDictionary dictionary] forState:UIControlStateHighlighted];
         _previousViewControllerBackButton = previousViewController.navigationItem.backBarButtonItem; // remember previous
@@ -295,18 +297,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
 }
 
-// Release any retained subviews of the main view.
-- (void)viewDidUnload {
-	_currentPageIndex = 0;
-    _pagingScrollView = nil;
-    _visiblePages = nil;
-    _recycledPages = nil;
-    _toolbar = nil;
-    _previousButton = nil;
-    _nextButton = nil;
-    _progressHUD = nil;
-    [super viewDidUnload];
-}
+// 旧的 viewDidUnload（iOS 6 废弃）已整体移除：iOS 6 起系统不再调用该方法，
+// 低内存时的视图释放由系统自动管理，无需手动置空子视图
 
 - (BOOL)presentingViewControllerPrefersStatusBarHidden {
     UIViewController *presenting = self.presentingViewController;
@@ -338,14 +330,17 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     if (!_viewHasAppearedInitially) {
         _leaveStatusBarAlone = [self presentingViewControllerPrefersStatusBarHidden];
         // Check if status bar is hidden on first appear, and if so then ignore it
-        if (CGRectEqualToRect([[UIApplication sharedApplication] statusBarFrame], CGRectZero)) {
+        // 旧的 statusBarFrame（iOS 9 废弃）替换为 statusBarManager.statusBarHidden
+        UIStatusBarManager *statusBarManager = self.view.window.windowScene.statusBarManager;
+        if (statusBarManager && statusBarManager.statusBarHidden) {
             _leaveStatusBarAlone = YES;
         }
     }
     // Set style
-    if (!_leaveStatusBarAlone && UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone) {
-        _previousStatusBarStyle = [[UIApplication sharedApplication] statusBarStyle];
-        [[UIApplication sharedApplication] setStatusBarStyle:UIStatusBarStyleLightContent animated:animated];
+    // 旧的 setStatusBarStyle:animated:（iOS 9 废弃）替换为触发 VC 状态栏更新，
+    // 具体样式由 preferredStatusBarStyle 返回 UIStatusBarStyleLightContent
+    if (!_leaveStatusBarAlone && [[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
+        [self setNeedsStatusBarAppearanceUpdate];
     }
     
     // Navigation bar appearance
@@ -417,11 +412,9 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     [NSObject cancelPreviousPerformRequestsWithTarget:self]; // Cancel any pending toggles from taps
     [self setControlsHidden:NO animated:NO permanent:YES];
     
-    // Status bar
-    if (!_leaveStatusBarAlone && UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone) {
-        [[UIApplication sharedApplication] setStatusBarStyle:_previousStatusBarStyle animated:animated];
-    }
-    
+    // 旧的 setStatusBarStyle 还原逻辑已移除：现代机制下系统会根据
+    // preferredStatusBarStyle 自动管理，无需手动保存和恢复状态栏样式
+
 	// Super
 	[super viewWillDisappear:animated];
     
@@ -446,9 +439,10 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     navBar.barTintColor = nil;
     navBar.shadowImage = nil;
     navBar.translucent = YES;
-    navBar.barStyle = UIBarStyleBlackTranslucent;
+    // UIBarStyleBlackTranslucent（iOS 13 废弃）替换为 UIBarStyleBlack，translucent 已在上方设为 YES
+    navBar.barStyle = UIBarStyleBlack;
     [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
-    [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsLandscapePhone];
+    // LandscapePhone metrics（iOS 8 废弃）已移除，横屏统一使用 Default metrics
 }
 
 - (void)storePreviousNavBarAppearance {
@@ -459,7 +453,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     _previousNavBarHidden = self.navigationController.navigationBarHidden;
     _previousNavBarStyle = self.navigationController.navigationBar.barStyle;
     _previousNavigationBarBackgroundImageDefault = [self.navigationController.navigationBar backgroundImageForBarMetrics:UIBarMetricsDefault];
-    _previousNavigationBarBackgroundImageLandscapePhone = [self.navigationController.navigationBar backgroundImageForBarMetrics:UIBarMetricsLandscapePhone];
+    // LandscapePhone 背景图保存已移除：iOS 8 后横屏使用统一 metrics
 }
 
 - (void)restorePreviousNavBarAppearance:(BOOL)animated {
@@ -471,7 +465,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         navBar.barTintColor = _previousNavBarBarTintColor;
         navBar.barStyle = _previousNavBarStyle;
         [navBar setBackgroundImage:_previousNavigationBarBackgroundImageDefault forBarMetrics:UIBarMetricsDefault];
-        [navBar setBackgroundImage:_previousNavigationBarBackgroundImageLandscapePhone forBarMetrics:UIBarMetricsLandscapePhone];
+        // LandscapePhone 背景图恢复已移除：iOS 8 后横屏使用统一 metrics
         // Restore back button if we need to
         if (_previousViewControllerBackButton) {
             UIViewController *previousViewController = [self.navigationController topViewController]; // We've disappeared so previous is now top
@@ -494,7 +488,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	_performingLayout = YES;
 	
 	// Toolbar
-	_toolbar.frame = [self frameForToolbarAtOrientation:self.interfaceOrientation];
+	_toolbar.frame = [self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]];
     
 	// Remember index
 	NSUInteger indexPriorToLayout = _currentPageIndex;
@@ -549,48 +543,39 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
 #pragma mark - Rotation
 
-- (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation {
-    return YES;
-}
-
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations {
     return UIInterfaceOrientationMaskAll;
 }
 
-- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
-    
-	// Remember page index before rotation
-	_pageIndexBeforeRotation = _currentPageIndex;
-	_rotating = YES;
-    
-    // In iOS 7 the nav bar gets shown after rotation, but might as well do this for everything!
+// 旧的 shouldAutorotateToInterfaceOrientation/willRotate/willAnimateRotation/didRotate
+// 四个 iOS 8 废弃回调已合并为这一个现代回调，原有三段逻辑分别迁移到
+// 过渡前准备、过渡动画、过渡完成三个阶段，行为保持一致
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+
+    // —— 对应旧 willRotate：记录旋转前页码，标记旋转中 ——
+    _pageIndexBeforeRotation = _currentPageIndex;
+    _rotating = YES;
     if ([self areControlsHidden]) {
         // Force hidden
         self.navigationController.navigationBarHidden = YES;
     }
-	
-}
 
-- (void)willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
-	
-	// Perform layout
-	_currentPageIndex = _pageIndexBeforeRotation;
-	
-	// Delay control holding
-	[self hideControlsAfterDelay];
-    
-    // Layout
-    [self layoutVisiblePages];
-	
-}
+    // 控件隐藏延迟计时，对应旧 willAnimate 中的 hideControlsAfterDelay
+    [self hideControlsAfterDelay];
 
-- (void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
-	_rotating = NO;
-    // Ensure nav bar isn't re-displayed
-    if ([self areControlsHidden]) {
-        self.navigationController.navigationBarHidden = NO;
-        self.navigationController.navigationBar.alpha = 0;
-    }
+    [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        // —— 对应旧 willAnimate：恢复页码并执行布局 ——
+        self->_currentPageIndex = self->_pageIndexBeforeRotation;
+        [self layoutVisiblePages];
+    } completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        // —— 对应旧 didRotate：结束旋转，导航栏保持隐藏但还原其 hidden 状态 ——
+        self->_rotating = NO;
+        if ([self areControlsHidden]) {
+            self.navigationController.navigationBarHidden = NO;
+            self.navigationController.navigationBar.alpha = 0;
+        }
+    }];
 }
 
 #pragma mark - Data
@@ -846,7 +831,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
                 }
                 [selectedButton setImage:selectedOnImage forState:UIControlStateSelected];
                 [selectedButton sizeToFit];
-                selectedButton.adjustsImageWhenHighlighted = NO;
+                // adjustsImageWhenHighlighted（iOS 15 废弃）已移除：该属性默认值即为 NO，删除后行为完全等价
                 [selectedButton addTarget:self action:@selector(selectedButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
                 selectedButton.frame = [self frameForSelectedButton:selectedButton atIndex:index];
                 [_pagingScrollView addSubview:selectedButton];
@@ -1002,9 +987,22 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	return CGPointMake(newOffset, 0);
 }
 
+/// 获取当前界面方向，替代已废弃的 self.interfaceOrientation（iOS 8 废弃）
+- (UIInterfaceOrientation)mw_currentInterfaceOrientation {
+    // 优先从 windowScene 获取（iOS 13+）
+    UIWindowScene *windowScene = self.view.window.windowScene;
+    if (windowScene) {
+        return windowScene.interfaceOrientation;
+    }
+    // 视图尚未挂到 window 时，根据 bounds 尺寸兜底判断
+    return self.view.bounds.size.width > self.view.bounds.size.height
+        ? UIInterfaceOrientationLandscapeLeft
+        : UIInterfaceOrientationPortrait;
+}
+
 - (CGRect)frameForToolbarAtOrientation:(UIInterfaceOrientation)orientation {
     CGFloat height = 44;
-    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone &&
+    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone &&
         UIInterfaceOrientationIsLandscape(orientation)) height = 32;
 	return CGRectIntegral(CGRectMake(0, self.view.bounds.size.height - height, self.view.bounds.size.width, height));
 }
@@ -1223,58 +1221,106 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
 - (void)_playVideo:(NSURL *)videoURL atPhotoIndex:(NSUInteger)index {
 
-    // Setup player
-    _currentVideoPlayerViewController = [[MPMoviePlayerViewController alloc] initWithContentURL:videoURL];
-    [_currentVideoPlayerViewController.moviePlayer prepareToPlay];
-    _currentVideoPlayerViewController.moviePlayer.shouldAutoplay = YES;
-    _currentVideoPlayerViewController.moviePlayer.scalingMode = MPMovieScalingModeAspectFit;
-    _currentVideoPlayerViewController.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
-    
-    // Remove the movie player view controller from the "playback did finish" notification observers
-    // Observe ourselves so we can get it to use the crossfade transition
-    [[NSNotificationCenter defaultCenter] removeObserver:_currentVideoPlayerViewController
-                                                    name:MPMoviePlayerPlaybackDidFinishNotification
-                                                  object:_currentVideoPlayerViewController.moviePlayer];
+    // 基于 AVKit 搭建播放器，替代已废弃的 MPMoviePlayerViewController
+    AVPlayer *player = [AVPlayer playerWithURL:videoURL];
+    AVPlayerViewController *playerViewController = [[AVPlayerViewController alloc] init];
+    playerViewController.player = player;
+    // 等价旧 moviePlayer.scalingMode = MPMovieScalingModeAspectFit
+    playerViewController.videoGravity = AVLayerVideoGravityResizeAspect;
+    // 显示系统播放控件，等价旧 moviePlayer 的默认控件
+    playerViewController.showsPlaybackControls = YES;
+    // 全屏呈现并保持原有的交叉淡入过渡
+    playerViewController.modalPresentationStyle = UIModalPresentationFullScreen;
+    playerViewController.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+    // 监听用户手动关闭（iOS 13+），由 presentationControllerDidDismiss: 回调
+    playerViewController.presentationController.delegate = self;
+
+    _currentVideoPlayerViewController = playerViewController;
+
+    // 监听播放结束，替代 MPMoviePlayerPlaybackDidFinishNotification
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(videoFinishedCallback:)
-                                                 name:MPMoviePlayerPlaybackDidFinishNotification
-                                               object:_currentVideoPlayerViewController.moviePlayer];
+                                             selector:@selector(videoDidPlayToEnd:)
+                                                 name:AVPlayerItemDidPlayToEndTimeNotification
+                                               object:player.currentItem];
 
-    // Show
-    [self presentViewController:_currentVideoPlayerViewController animated:YES completion:nil];
+    // KVO 监听播放项状态以捕获错误，替代 MPMovieFinishReasonPlaybackError
+    [player.currentItem addObserver:self
+                         forKeyPath:NSStringFromSelector(@selector(status))
+                            options:NSKeyValueObservingOptionNew
+                            context:MWVideoPlayerObservation];
+
+    // 呈现完成后自动播放，等价旧 moviePlayer.shouldAutoplay = YES
+    [self presentViewController:playerViewController animated:YES completion:^{
+        [player play];
+    }];
 
 }
 
-- (void)videoFinishedCallback:(NSNotification*)notification {
-    
-    // Remove observer
-    [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                    name:MPMoviePlayerPlaybackDidFinishNotification
-                                                  object:_currentVideoPlayerViewController.moviePlayer];
-    
-    // Clear up
-    [self clearCurrentVideo];
-    
-    // Dismiss
-    BOOL error = [[[notification userInfo] objectForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue] == MPMovieFinishReasonPlaybackError;
-    if (error) {
-        // Error occured so dismiss with a delay incase error was immediate and we need to wait to dismiss the VC
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [self dismissViewControllerAnimated:YES completion:nil];
-        });
+#pragma mark - AVPlayer Callbacks
+
+// KVO：播放项状态变化，失败时按旧逻辑延迟 1 秒再关闭
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey, id> *)change
+                       context:(void *)context {
+    if (context == MWVideoPlayerObservation) {
+        AVPlayerItem *item = object;
+        if (item.status == AVPlayerItemStatusFailed) {
+            // 错误可能立即发生，延迟 1 秒再关闭，与旧错误分支一致
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                [self dismissVideoPlayer];
+            });
+        }
     } else {
-        [self dismissViewControllerAnimated:YES completion:nil];
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
     }
-    
 }
 
-- (void)clearCurrentVideo {
-    [_currentVideoPlayerViewController.moviePlayer stop];
+// 播放自然结束
+- (void)videoDidPlayToEnd:(NSNotification *)notification {
+    [self dismissVideoPlayer];
+}
+
+// 用户手动关闭（全屏 AVPlayerViewController 的关闭按钮/下拉手势）
+- (void)presentationControllerDidDismiss:(UIPresentationController *)presentationController {
+    // 视图已由系统关闭，只需内部清理，不再重复 dismiss
+    [self teardownVideoPlayer];
+}
+
+/// 主动关闭播放器（播放结束/出错路径）：先内部清理再关闭模态
+- (void)dismissVideoPlayer {
+    if (!_currentVideoPlayerViewController) return;
+    [self teardownVideoPlayer];
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+/// 内部清理：移除观察者、暂停播放、还原播放按钮、重置状态
+- (void)teardownVideoPlayer {
+    AVPlayerViewController *playerViewController = _currentVideoPlayerViewController;
+    if (!playerViewController) return; // 防重入，保证多次调用安全
+
+    // 移除播放结束通知
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:AVPlayerItemDidPlayToEndTimeNotification
+                                                  object:playerViewController.player.currentItem];
+    // 移除状态 KVO
+    [playerViewController.player.currentItem removeObserver:self
+                                                forKeyPath:NSStringFromSelector(@selector(status))
+                                                   context:MWVideoPlayerObservation];
+    // 暂停播放，等价旧 moviePlayer.stop
+    [playerViewController.player pause];
+
     [_currentVideoLoadingIndicator removeFromSuperview];
     _currentVideoPlayerViewController = nil;
     _currentVideoLoadingIndicator = nil;
     [[self pageDisplayedAtIndex:_currentVideoIndex] playButton].hidden = NO;
     _currentVideoIndex = NSUIntegerMax;
+}
+
+- (void)clearCurrentVideo {
+    // 方法名保留供原有各调用点使用，内部转由现代清理实现
+    [self teardownVideoPlayer];
 }
 
 - (void)setVideoLoadingIndicatorVisible:(BOOL)visible atPageIndex:(NSUInteger)pageIndex {
@@ -1346,12 +1392,13 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     // Animate grid in and photo scroller out
     [_gridController willMoveToParentViewController:self];
     [UIView animateWithDuration:animated ? 0.3 : 0 animations:^(void) {
-        _gridController.view.frame = self.view.bounds;
+        // 显式 self 消除 block 隐式 retain 警告
+        self->_gridController.view.frame = self.view.bounds;
         CGRect newPagingFrame = [self frameForPagingScrollView];
         newPagingFrame = CGRectOffset(newPagingFrame, 0, (self.startOnGrid ? 1 : -1) * newPagingFrame.size.height);
-        _pagingScrollView.frame = newPagingFrame;
+        self->_pagingScrollView.frame = newPagingFrame;
     } completion:^(BOOL finished) {
-        [_gridController didMoveToParentViewController:self];
+        [self->_gridController didMoveToParentViewController:self];
     }];
     
 }
@@ -1384,7 +1431,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     // Animate, hide grid and show paging scroll view
     [UIView animateWithDuration:0.3 animations:^{
         tmpGridController.view.frame = CGRectOffset(self.view.bounds, 0, (self.startOnGrid ? -1 : 1) * self.view.bounds.size.height);
-        _pagingScrollView.frame = [self frameForPagingScrollView];
+        // 显式 self 消除 block 隐式 retain 警告
+        self->_pagingScrollView.frame = [self frameForPagingScrollView];
     } completion:^(BOOL finished) {
         [tmpGridController willMoveToParentViewController:nil];
         [tmpGridController.view removeFromSuperview];
@@ -1412,24 +1460,14 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     CGFloat animationDuration = (animated ? 0.35 : 0);
     
     // Status bar
+    // 非 VC based 分支已删除，统一通过 VC 机制更新状态栏显隐，
+    // prefersStatusBarHidden 读取 _statusBarShouldBeHidden，动画样式由
+    // preferredStatusBarUpdateAnimation 指定为 slide，与旧效果一致
     if (!_leaveStatusBarAlone) {
-
-        // Hide status bar
-        if (!_isVCBasedStatusBarAppearance) {
-            
-            // Non-view controller based
-            [[UIApplication sharedApplication] setStatusBarHidden:hidden withAnimation:animated ? UIStatusBarAnimationSlide : UIStatusBarAnimationNone];
-            
-        } else {
-            
-            // View controller based so animate away
-            _statusBarShouldBeHidden = hidden;
-            [UIView animateWithDuration:animationDuration animations:^(void) {
-                [self setNeedsStatusBarAppearanceUpdate];
-            } completion:^(BOOL finished) {}];
-            
-        }
-
+        _statusBarShouldBeHidden = hidden;
+        [UIView animateWithDuration:animationDuration animations:^(void) {
+            [self setNeedsStatusBarAppearanceUpdate];
+        } completion:^(BOOL finished) {}];
     }
     
     // Toolbar, nav bar and captions
@@ -1437,7 +1475,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     if ([self areControlsHidden] && !hidden && animated) {
         
         // Toolbar
-        _toolbar.frame = CGRectOffset([self frameForToolbarAtOrientation:self.interfaceOrientation], 0, animatonOffset);
+        _toolbar.frame = CGRectOffset([self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]], 0, animatonOffset);
         
         // Captions
         for (MWZoomingScrollView *page in _visiblePages) {
@@ -1459,12 +1497,13 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         [self.navigationController.navigationBar setAlpha:alpha];
         
         // Toolbar
-        _toolbar.frame = [self frameForToolbarAtOrientation:self.interfaceOrientation];
-        if (hidden) _toolbar.frame = CGRectOffset(_toolbar.frame, 0, animatonOffset);
-        _toolbar.alpha = alpha;
+        // 显式 self 消除 block 隐式 retain 警告
+        self->_toolbar.frame = [self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]];
+        if (hidden) self->_toolbar.frame = CGRectOffset(self->_toolbar.frame, 0, animatonOffset);
+        self->_toolbar.alpha = alpha;
 
         // Captions
-        for (MWZoomingScrollView *page in _visiblePages) {
+        for (MWZoomingScrollView *page in self->_visiblePages) {
             if (page.captionView) {
                 MWCaptionView *v = page.captionView;
                 // Pass any index, all we're interested in is the Y
@@ -1475,9 +1514,9 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
                 v.alpha = alpha;
             }
         }
-        
+
         // Selected buttons
-        for (MWZoomingScrollView *page in _visiblePages) {
+        for (MWZoomingScrollView *page in self->_visiblePages) {
             if (page.selectedButton) {
                 UIButton *v = page.selectedButton;
                 CGRect newFrame = [self frameForSelectedButton:v atIndex:0];
@@ -1610,15 +1649,22 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
             // Show
             typeof(self) __weak weakSelf = self;
-            [self.activityViewController setCompletionHandler:^(NSString *activityType, BOOL completed) {
+            [self.activityViewController setCompletionWithItemsHandler:^(UIActivityType  _Nullable activityType, BOOL completed, NSArray * _Nullable returnedItems, NSError * _Nullable activityError) {
                 weakSelf.activityViewController = nil;
                 [weakSelf hideControlsAfterDelay];
                 [weakSelf hideProgressHUD:YES];
             }];
+//            [self.activityViewController setCompletionHandler:^(NSString *activityType, BOOL completed) {
+//                weakSelf.activityViewController = nil;
+//                [weakSelf hideControlsAfterDelay];
+//                [weakSelf hideProgressHUD:YES];
+//            }];
+            
             // iOS 8 - Set the Anchor Point for the popover
-            if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"8")) {
-                self.activityViewController.popoverPresentationController.barButtonItem = _actionButton;
-            }
+            self.activityViewController.popoverPresentationController.barButtonItem = _actionButton;
+//            if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"8")) {
+//                self.activityViewController.popoverPresentationController.barButtonItem = _actionButton;
+//            }
             [self presentViewController:self.activityViewController animated:YES completion:nil];
 
         }

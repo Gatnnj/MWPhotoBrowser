@@ -27,15 +27,16 @@ Pod::Spec.new do |s|
     :git => 'https://github.com/mwaterfall/MWPhotoBrowser.git',
     :tag => '2.1.2'
   }
-  s.platform = :ios, '11.0'
+  s.platform = :ios, '15.0'
   s.source_files = 'Pod/Classes/**/*'
   s.resource_bundles = {
     'MWPhotoBrowser' => ['Pod/Assets/*.png']
   }
   s.requires_arc = true
 
-  s.frameworks = 'ImageIO', 'QuartzCore', 'AssetsLibrary', 'MediaPlayer'
-  s.weak_frameworks = 'Photos'
+  # AssetsLibrary、MediaPlayer 已移除（iOS 9 废弃），
+  # 替换为视频所需的 AVKit/AVFoundation，Photos 由弱框架改为强依赖
+  s.frameworks = 'ImageIO', 'QuartzCore', 'AVKit', 'AVFoundation', 'Photos'
 
   s.dependency 'MBProgressHUD', '~> 0.9'
   s.dependency 'DACircularProgress', '~> 2.3'

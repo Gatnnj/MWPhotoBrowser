@@ -38,7 +38,8 @@
 
 @end
 
-@interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate, UIActionSheetDelegate>
+// UIActionSheetDelegate 已移除：该协议自 iOS 8 废弃，且本类没有实现任何 UIActionSheet 相关方法，属于历史残留
+@interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate>
 
 @property (nonatomic, weak) IBOutlet id<MWPhotoBrowserDelegate> delegate;
 @property (nonatomic) BOOL zoomPhotosToFill;
