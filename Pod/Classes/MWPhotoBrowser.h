@@ -28,6 +28,10 @@
 @optional
 
 - (id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser thumbPhotoAtIndex:(NSUInteger)index;
+
+// 丝滑转场（可选）：返回该图片在列表中的缩略图视图，浏览器会从该视图位置
+// 连贯放大进入、关闭时飞回该位置；不实现则自动降级为渐隐，老调用方完全兼容
+- (UIView *)photoBrowser:(MWPhotoBrowser *)photoBrowser startingViewForPhotoAtIndex:(NSUInteger)index;
 - (MWCaptionView *)photoBrowser:(MWPhotoBrowser *)photoBrowser captionViewForPhotoAtIndex:(NSUInteger)index;
 - (NSString *)photoBrowser:(MWPhotoBrowser *)photoBrowser titleForPhotoAtIndex:(NSUInteger)index;
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser didDisplayPhotoAtIndex:(NSUInteger)index;
@@ -39,7 +43,7 @@
 @end
 
 // UIActionSheetDelegate 已移除：该协议自 iOS 8 废弃，且本类没有实现任何 UIActionSheet 相关方法，属于历史残留
-@interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate>
+@interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate, UIViewControllerTransitioningDelegate>
 
 @property (nonatomic, weak) IBOutlet id<MWPhotoBrowserDelegate> delegate;
 @property (nonatomic) BOOL zoomPhotosToFill;
@@ -49,6 +53,10 @@
 @property (nonatomic) BOOL alwaysShowControls;
 @property (nonatomic) BOOL enableGrid;
 @property (nonatomic) BOOL enableSwipeToDismiss;
+// 是否启用自定义丝滑转场（连贯放大 + 拖拽关闭），默认 NO 保持原有行为；
+// 启用后需以 UIModalPresentationOverFullScreen 呈现（保留底层视图以支持拖拽透底），
+// 并把包装用导航控制器的 transitioningDelegate 指向本浏览器
+@property (nonatomic) BOOL enableCustomTransition;
 @property (nonatomic) BOOL startOnGrid;
 @property (nonatomic) BOOL autoPlayOnAppear;
 @property (nonatomic) NSUInteger delayToHideElements;

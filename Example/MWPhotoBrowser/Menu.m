@@ -15,6 +15,11 @@
 #endif
 #import "MWCommon.h"
 
+// 丝滑转场演示专用：在窗口上放置一个缩略图作为连贯动画的起点
+@interface Menu ()
+@property (nonatomic, weak) UIImageView *demoSourceImageView;
+@end
+
 @implementation Menu
 
 #pragma mark -
@@ -34,7 +39,7 @@
         
         UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:_segmentedControl];
         self.navigationItem.rightBarButtonItem = item;
-        self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Back" style:UIBarButtonItemStyleBordered target:nil action:nil];
+        self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Back" style:UIBarButtonItemStylePlain target:nil action:nil];
 
         [self loadAssets];
         
@@ -89,7 +94,8 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    NSInteger rows = 9;
+    // 固定项新增“丝滑转场演示”一行，故基础行数由 9 改为 10
+    NSInteger rows = 10;
     @synchronized(_assets) {
         if (_assets.count) rows++;
     }
@@ -154,6 +160,11 @@
             break;
         }
 		case 9: {
+            cell.textLabel.text = @"Smooth transition";
+            cell.detailTextLabel.text = @"coherent zoom & drag to dismiss (Modal)";
+            break;
+        }
+		case 10: {
             cell.textLabel.text = @"Library photos and videos";
             cell.detailTextLabel.text = @"media from device library";
             break;
@@ -1081,6 +1092,11 @@
             break;
         }
 		case 9: {
+            // 丝滑转场演示：独立处理并直接返回，不走后续统一创建流程
+            [self showSmoothTransition];
+            return;
+        }
+		case 10: {
             @synchronized(_assets) {
                 NSMutableArray *copy = [_assets copy];
                 if (NSClassFromString(@"PHAsset")) {
@@ -1185,10 +1201,56 @@
 
 }
 
+#pragma mark - 丝滑转场演示
+
+- (void)showSmoothTransition {
+    // 1. 准备本地图片数据
+    NSMutableArray *demoPhotos = [NSMutableArray array];
+    NSArray *names = @[@"photo1", @"photo2", @"photo3", @"photo4"];
+    for (NSString *name in names) {
+        MWPhoto *p = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:name ofType:@"jpg"]]];
+        [demoPhotos addObject:p];
+    }
+    self.photos = demoPhotos;
+
+    // 2. 在窗口左下角放一个缩略图作为连贯动画起点
+    // 真实 App 中应直接传入列表 cell 上的 imageView，无需额外创建
+    UIImage *firstImage = [UIImage imageWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"photo1" ofType:@"jpg"]];
+    UIImageView *source = [[UIImageView alloc] initWithImage:firstImage];
+    source.contentMode = UIViewContentModeScaleAspectFill;
+    source.clipsToBounds = YES;
+    CGFloat thumbSize = 80;
+    source.frame = CGRectMake(20, self.view.bounds.size.height - 130, thumbSize, thumbSize);
+    [self.view.window addSubview:source];
+    self.demoSourceImageView = source;
+
+    // 3. 创建浏览器并启用自定义转场
+    MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
+    browser.enableCustomTransition = YES;
+    browser.enableGrid = NO;
+    browser.displayActionButton = NO;
+    [browser setCurrentPhotoIndex:0];
+
+    // 4. 使用 OverFullScreen 保留底层列表，拖拽时才能透出背景
+    UINavigationController *nc = [[UINavigationController alloc] initWithRootViewController:browser];
+    nc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    nc.view.backgroundColor = [UIColor clearColor];
+    nc.view.opaque = NO;
+    nc.transitioningDelegate = browser;
+    [self presentViewController:nc animated:YES completion:nil];
+}
+
 #pragma mark - MWPhotoBrowserDelegate
 
 - (NSUInteger)numberOfPhotosInPhotoBrowser:(MWPhotoBrowser *)photoBrowser {
     return _photos.count;
+}
+
+// 丝滑转场：返回连贯动画的起始/飞回缩略图
+- (UIView *)photoBrowser:(MWPhotoBrowser *)photoBrowser startingViewForPhotoAtIndex:(NSUInteger)index {
+    // 仅首张返回演示源视图，其余页返回 nil 由动画器自动降级
+    if (index == 0) return self.demoSourceImageView;
+    return nil;
 }
 
 - (id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser photoAtIndex:(NSUInteger)index {
@@ -1233,7 +1295,11 @@
 - (void)photoBrowserDidFinishModalPresentation:(MWPhotoBrowser *)photoBrowser {
     // If we subscribe to this method we must dismiss the view controller ourselves
     NSLog(@"Did finish modal presentation");
-    [self dismissViewControllerAnimated:YES completion:nil];
+    UIImageView *demoSource = self.demoSourceImageView;
+    [self dismissViewControllerAnimated:YES completion:^{
+        // 关闭动画结束后移除演示用的缩略图源视图
+        [demoSource removeFromSuperview];
+    }];
 }
 
 #pragma mark - Load Assets

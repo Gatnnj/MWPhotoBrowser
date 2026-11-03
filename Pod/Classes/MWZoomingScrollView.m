@@ -41,6 +41,7 @@
 		_tapView.tapDelegate = self;
 		_tapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 		_tapView.backgroundColor = [UIColor blackColor];
+		_tapView.opaque = NO;
 		[self addSubview:_tapView];
 		
 		// Image view
@@ -48,6 +49,7 @@
 		_photoImageView.tapDelegate = self;
 		_photoImageView.contentMode = UIViewContentModeCenter;
 		_photoImageView.backgroundColor = [UIColor blackColor];
+		_photoImageView.opaque = NO;
 		[self addSubview:_photoImageView];
 		
 		// Loading indicator
@@ -356,6 +358,23 @@
 
 - (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView {
 	return _photoImageView;
+}
+
+- (MWPhotoBrowser *)photoBrowser {
+    return _photoBrowser;
+}
+
+- (UIView *)photoImageViewForTransition {
+    return _photoImageView;
+}
+
+- (void)setBackgroundAlpha:(CGFloat)alpha {
+    // 仅改变各层黑色背景，图片（photoImageView.image）不受影响
+    UIColor *background = [UIColor colorWithWhite:0 alpha:alpha];
+    self.backgroundColor = background;
+    self.opaque = NO;
+    _tapView.backgroundColor = background;
+    _photoImageView.backgroundColor = background;
 }
 
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {

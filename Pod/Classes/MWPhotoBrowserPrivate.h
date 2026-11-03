@@ -14,10 +14,13 @@
 #import "MWZoomingScrollView.h"
 
 @class AVPlayerViewController;
+@class MWPhotoInteractiveTransition;
+@class MWPhotoTransitionAnimator;
 
 // Declare private methods of browser
-// 遵循 UIAdaptivePresentationControllerDelegate 以监听用户手动关闭播放器
-@interface MWPhotoBrowser () <UIAdaptivePresentationControllerDelegate> {
+// 遵循 UIAdaptivePresentationControllerDelegate 以监听用户手动关闭播放器；
+// 遵循 UIViewControllerTransitioningDelegate 以提供自定义丝滑转场
+@interface MWPhotoBrowser () <UIAdaptivePresentationControllerDelegate, UIViewControllerTransitioningDelegate> {
     
 	// Data
     NSUInteger _photoCount;
@@ -81,11 +84,14 @@
 
 // Properties
 @property (nonatomic) UIActivityViewController *activityViewController;
+// 自定义转场的交互控制器（拖拽关闭），启用丝滑转场时创建
+@property (nonatomic, strong) MWPhotoInteractiveTransition *interactiveTransition;
 
 // Layout
 - (void)layoutVisiblePages;
 - (void)performLayout;
 - (BOOL)presentingViewControllerPrefersStatusBarHidden;
+- (UIView *)mw_startingView;
 
 // Nav Bar Appearance
 - (void)setNavBarAppearance:(BOOL)animated;

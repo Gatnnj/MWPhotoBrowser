@@ -13,6 +13,8 @@
 #import "MWCommon.h"
 #import "MWPhotoBrowser.h"
 #import "MWPhotoBrowserPrivate.h"
+#import "MWPhotoTransitionAnimator.h"
+#import "MWPhotoInteractiveTransition.h"
 #import "SDImageCache.h"
 #import "UIImage+MWPhotoBrowser.h"
 
@@ -93,6 +95,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 }
 
 - (void)dealloc {
+    NSLog(@"%@ - dealloc", NSStringFromClass(self.class));
     [self clearCurrentVideo];
     _pagingScrollView.delegate = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -146,6 +149,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	
 	// View
 	self.view.backgroundColor = [UIColor blackColor];
+	self.view.opaque = NO;
     self.view.clipsToBounds = YES;
 	
 	// Setup paging scrolling view
@@ -160,6 +164,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	_pagingScrollView.showsHorizontalScrollIndicator = NO;
 	_pagingScrollView.showsVerticalScrollIndicator = NO;
 	_pagingScrollView.backgroundColor = [UIColor blackColor];
+	_pagingScrollView.opaque = NO;
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
 	[self.view addSubview:_pagingScrollView];
 	
@@ -186,16 +191,65 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         _actionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
     }
     
+    // 自定义丝滑转场：交互控制器把手势装在根视图，只对内部图片视图做 transform
+    // （对照 JXPhotoBrowser），因此与 reloadData 先后顺序无关
+    if (_enableCustomTransition) {
+        __weak typeof(self) weakSelf = self;
+        self.interactiveTransition =
+        [[MWPhotoInteractiveTransition alloc] initWithCurrentImageViewBlock:^UIView *{
+            MWPhotoBrowser *strongSelf = weakSelf;
+            if (!strongSelf) return nil;
+            // 先按当前索引找 page；找不到（索引不匹配）时退化为取任意可见页
+            MWZoomingScrollView *page = [strongSelf pageDisplayedAtIndex:strongSelf.currentIndex];
+            if (!page && strongSelf->_visiblePages.count > 0) {
+                page = strongSelf->_visiblePages.allObjects.firstObject;
+            }
+            // 正确的"未放大"判断：当前处于最小缩放（初始 zoomScale 可能不等于 1）
+            if (page.zoomScale > page.minimumZoomScale + 0.01) return nil;
+            return [page photoImageViewForTransition];
+        } setPagingEnabled:^(BOOL enabled) {
+            MWPhotoBrowser *strongSelf = weakSelf;
+            // nil 时直接返回：nil 的 ivar 直接解引用会崩溃（给 nil 发消息才安全）
+            if (!strongSelf) return;
+            strongSelf->_pagingScrollView.scrollEnabled = enabled;
+        } setBackgroundAlpha:^(CGFloat alpha) {
+            MWPhotoBrowser *strongSelf = weakSelf;
+            if (!strongSelf) return;
+            // 统一控制各层黑色背景，图片本身不透明
+            UIColor *background = [UIColor colorWithWhite:0 alpha:alpha];
+            strongSelf.view.backgroundColor = background;
+            strongSelf.view.opaque = NO;
+            strongSelf.navigationController.view.backgroundColor = [UIColor clearColor];
+            strongSelf.navigationController.view.opaque = NO;
+            // 导航栏整体（含标题和按钮）与浏览器背景共用同一 alpha。
+            strongSelf.navigationController.navigationBar.alpha = alpha;
+            strongSelf->_pagingScrollView.backgroundColor = background;
+            strongSelf->_pagingScrollView.opaque = NO;
+            for (MWZoomingScrollView *page in strongSelf->_visiblePages) {
+                [page setBackgroundAlpha:alpha];
+            }
+        } dismissTargetBlock:^UIView *{
+            return [weakSelf mw_startingView];
+        } dismissBlock:^{
+            // 拖拽快照已经完成了完整的缩略图回收动画，系统 dismiss 动画关闭，
+            // 避免松手后又额外播放一次重复的 zoom-out。
+            [weakSelf dismissViewControllerAnimated:NO completion:nil];
+        }];
+        // 手势安装在浏览器根视图
+        [self.interactiveTransition installGestureOnRootView:self.view];
+    }
+
     // Update
     [self reloadData];
-    
-    // Swipe to dismiss
-    if (_enableSwipeToDismiss) {
+
+    // 自定义转场启用时由交互式下拉手势负责关闭；旧的 swipe 手势会
+    // 在手指释放前直接触发 dismiss，破坏图片跟手的交互体验。
+    if (_enableSwipeToDismiss && !_enableCustomTransition) {
         UISwipeGestureRecognizer *swipeGesture = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(doneButtonPressed:)];
         swipeGesture.direction = UISwipeGestureRecognizerDirectionDown | UISwipeGestureRecognizerDirectionUp;
         [self.view addGestureRecognizer:swipeGesture];
     }
-    
+
 	// Super
     [super viewDidLoad];
 	
@@ -441,7 +495,15 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     navBar.translucent = YES;
     // UIBarStyleBlackTranslucent（iOS 13 废弃）替换为 UIBarStyleBlack，translucent 已在上方设为 YES
     navBar.barStyle = UIBarStyleBlack;
-    [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
+    if (_enableCustomTransition) {
+        // 禁用系统导航栏的模糊材质背景，避免它与浏览器黑色背景叠加后
+        // 产生不同的透底速度；导航栏内容和浏览器背景使用同一 alpha。
+        [navBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
+        navBar.shadowImage = [UIImage new];
+        navBar.backgroundColor = [UIColor clearColor];
+    } else {
+        [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
+    }
     // LandscapePhone metrics（iOS 8 废弃）已移除，横屏统一使用 Default metrics
 }
 
@@ -1613,6 +1675,50 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
             [self dismissViewControllerAnimated:YES completion:nil];
         }
     }
+}
+
+#pragma mark - UIViewControllerTransitioningDelegate
+
+/// 获取当前图片对应的起始缩略图视图（调用方未实现则为 nil）
+- (UIView *)mw_startingView {
+    if ([_delegate respondsToSelector:@selector(photoBrowser:startingViewForPhotoAtIndex:)]) {
+        return [_delegate photoBrowser:self startingViewForPhotoAtIndex:_currentPageIndex];
+    }
+    return nil;
+}
+
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented
+                                                                   presentingController:(UIViewController *)presenting
+                                                                       sourceController:(UIViewController *)source {
+    MWPhotoTransitionAnimator *animator = [[MWPhotoTransitionAnimator alloc] init];
+    animator.dismissing = NO;
+    UIView *startView = [self mw_startingView];
+    animator.startView = startView;
+    // 取缩略图上的图片作为连贯移动素材，取不到则动画器内部自动降级渐隐
+    if ([startView isKindOfClass:[UIImageView class]]) {
+        animator.transitionImage = ((UIImageView *)startView).image;
+    }
+    return animator;
+}
+
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed {
+    MWPhotoTransitionAnimator *animator = [[MWPhotoTransitionAnimator alloc] init];
+    animator.dismissing = YES;
+    // 关闭时飞回的目标缩略图
+    animator.endView = [self mw_startingView];
+    // 提供当前页图片视图，动画器从其当前实际位置（含拖拽 transform）飞回
+    MWZoomingScrollView *page = [self pageDisplayedAtIndex:_currentPageIndex];
+    animator.dismissingImageView = [page photoImageViewForTransition];
+    return animator;
+}
+
+- (id<UIViewControllerInteractiveTransitioning>)interactionControllerForDismissal:(id<UIViewControllerAnimatedTransitioning>)animator {
+    // 拖拽在手势结束后以非交互方式触发，始终返回 nil
+    return nil;
+}
+
+- (id<UIViewControllerInteractiveTransitioning>)interactionControllerForPresentation:(id<UIViewControllerAnimatedTransitioning>)animator {
+    return nil;
 }
 
 #pragma mark - Actions
