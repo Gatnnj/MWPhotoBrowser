@@ -20,15 +20,30 @@
 @property (nonatomic, strong) NSURL *videoURL;
 @property (nonatomic) BOOL emptyImage;
 @property (nonatomic) BOOL isVideo;
+/// 切换后会在已加载图片上异步重新处理，并通知浏览器刷新当前页。
+@property (nonatomic) BOOL isBlur;
+/// 高斯模糊半径，默认 30；图片已加载时修改也会重新处理。
+@property (nonatomic) CGFloat radius;
+
 
 + (MWPhoto *)photoWithImage:(UIImage *)image;
 + (MWPhoto *)photoWithURL:(NSURL *)url;
++ (MWPhoto *)photoWithURL:(NSURL *)url isBlur:(BOOL)isBlur;
 + (MWPhoto *)photoWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize;
 + (MWPhoto *)videoWithURL:(NSURL *)url; // Initialise video with no poster image
+
+/// Asynchronously remove all generated Gaussian blur files from the caches directory.
++ (void)clearBlurCache;
+/// Completion is called on the main queue after cache files are removed.
++ (void)clearBlurCacheWithCompletion:(void (^)(void))completion;
+/// Asynchronously remove generated blur files for a URL, at every radius.
++ (void)clearBlurCacheForURL:(NSURL *)url;
++ (void)clearBlurCacheForURL:(NSURL *)url completion:(void (^)(void))completion;
 
 - (id)init;
 - (id)initWithImage:(UIImage *)image;
 - (id)initWithURL:(NSURL *)url;
+- (id)initWithURL:(NSURL *)url isBlur:(BOOL)isBlur;
 - (id)initWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize;
 - (id)initWithVideoURL:(NSURL *)url;
 

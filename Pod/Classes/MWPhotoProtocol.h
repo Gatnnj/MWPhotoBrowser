@@ -54,6 +54,11 @@
 
 @optional
 
+// is Gaussian blur
+@property (nonatomic) BOOL isBlur;
+// default 30.0
+@property (nonatomic) CGFloat radius;
+
 // If photo is empty, in which case, don't show loading error icons
 @property (nonatomic) BOOL emptyImage;
 

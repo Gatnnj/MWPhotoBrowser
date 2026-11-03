@@ -1206,10 +1206,13 @@
 - (void)showSmoothTransition {
     // 1. 准备本地图片数据
     NSMutableArray *demoPhotos = [NSMutableArray array];
-    NSArray *names = @[@"photo1", @"photo2", @"photo3", @"photo4"];
+    NSArray *names = @[@"photo1", @"photo2", @"photo2", @"photo3", @"photo4"];
+    NSInteger index = 0;
     for (NSString *name in names) {
-        MWPhoto *p = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:name ofType:@"jpg"]]];
+        MWPhoto *p = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:name ofType:@"jpg"]] isBlur:[name isEqualToString:@"photo2"]];
+        p.radius = index == 1 ? 30 : 20;
         [demoPhotos addObject:p];
+        index++;
     }
     self.photos = demoPhotos;
 

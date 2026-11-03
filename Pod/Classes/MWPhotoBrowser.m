@@ -268,7 +268,9 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     // Navigation buttons
     if ([self.navigationController.viewControllers objectAtIndex:0] == self) {
         // We're first on stack so show done button
-        _doneButton = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Done", nil) style:UIBarButtonItemStylePlain target:self action:@selector(doneButtonPressed:)];
+        NSString *doneTitle = NSLocalizedString(@"Done", nil);
+        if (doneTitle.length == 0) doneTitle = @"Done";
+        _doneButton = [[UIBarButtonItem alloc] initWithTitle:doneTitle style:UIBarButtonItemStylePlain target:self action:@selector(doneButtonPressed:)];
         // Set appearance
         [_doneButton setBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
         [_doneButton setBackgroundImage:nil forState:UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
@@ -278,7 +280,10 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     } else {
         // We're not first so show back button
         UIViewController *previousViewController = [self.navigationController.viewControllers objectAtIndex:self.navigationController.viewControllers.count-2];
-        NSString *backButtonTitle = previousViewController.navigationItem.backBarButtonItem ? previousViewController.navigationItem.backBarButtonItem.title : previousViewController.title;
+        NSString *backButtonTitle = previousViewController.navigationItem.backBarButtonItem.title;
+        if (backButtonTitle.length == 0) backButtonTitle = previousViewController.title;
+        if (backButtonTitle.length == 0) backButtonTitle = NSLocalizedString(@"Back", nil);
+        if (backButtonTitle.length == 0) backButtonTitle = @"Back";
         UIBarButtonItem *newBackButton = [[UIBarButtonItem alloc] initWithTitle:backButtonTitle style:UIBarButtonItemStylePlain target:nil action:nil];
         // Appearance
         [newBackButton setBackButtonBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];

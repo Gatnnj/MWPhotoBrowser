@@ -214,9 +214,11 @@
 }
 
 - (void)showLoadingIndicator {
-    self.zoomScale = 0;
-    self.minimumZoomScale = 0;
-    self.maximumZoomScale = 0;
+    // UIScrollView 的缩放比例必须为正数；0 会触发
+    // _clampedZoomScale:allowRubberbanding: 的系统警告。
+    self.minimumZoomScale = 1;
+    self.maximumZoomScale = 1;
+    self.zoomScale = 1;
     _loadingIndicator.progress = 0;
     _loadingIndicator.hidden = NO;
     [self hideImageFailure];
@@ -230,6 +232,7 @@
         // Zoom image to fill if the aspect ratios are fairly similar
         CGSize boundsSize = self.bounds.size;
         CGSize imageSize = _photoImageView.image.size;
+        if (boundsSize.width <= 0 || boundsSize.height <= 0 || imageSize.width <= 0 || imageSize.height <= 0) return zoomScale;
         CGFloat boundsAR = boundsSize.width / boundsSize.height;
         CGFloat imageAR = imageSize.width / imageSize.height;
         CGFloat xScale = boundsSize.width / imageSize.width;    // the scale needed to perfectly fit the image width-wise
@@ -247,8 +250,8 @@
 - (void)setMaxMinZoomScalesForCurrentBounds {
     
     // Reset
-    self.maximumZoomScale = 1;
     self.minimumZoomScale = 1;
+    self.maximumZoomScale = 1;
     self.zoomScale = 1;
     
     // Bail if no image
@@ -260,6 +263,8 @@
     // Sizes
     CGSize boundsSize = self.bounds.size;
     CGSize imageSize = _photoImageView.image.size;
+    // 首次布局或旋转过程中 bounds 可能暂时为零，保留上面的 1 倍安全值。
+    if (boundsSize.width <= 0 || boundsSize.height <= 0 || imageSize.width <= 0 || imageSize.height <= 0) return;
     
     // Calculate Min
     CGFloat xScale = boundsSize.width / imageSize.width;    // the scale needed to perfectly fit the image width-wise

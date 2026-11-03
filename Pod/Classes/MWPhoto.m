@@ -13,8 +13,68 @@
 #endif
 // AssetsLibrary（iOS 9 废弃）替换为 Photos 框架
 #import <Photos/Photos.h>
+#import <CommonCrypto/CommonDigest.h>
+#import <math.h>
 #import "MWPhoto.h"
 #import "MWPhotoBrowser.h"
+#import "UIImage+MWPhotoBrowser.h"
+
+static dispatch_queue_t MWPhotoBlurQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queue = dispatch_queue_create("com.mwphotobrowser.image-blur", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
+static NSString *MWPhotoBlurCacheDirectory(void) {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    return [[paths.firstObject stringByAppendingPathComponent:@"MWPhotoBrowserBlurCache"] copy];
+}
+
+/// Cache by the URL path only; query parameters may contain rotating credentials.
+static NSString *MWPhotoCanonicalBlurCacheURL(NSURL *url) {
+    if (!url) return nil;
+    return [url.absoluteString componentsSeparatedByString:@"?"].firstObject;
+}
+
+static NSString *MWPhotoBlurCachePrefix(NSURL *url) {
+    if (!url) return nil;
+    NSData *data = [MWPhotoCanonicalBlurCacheURL(url) dataUsingEncoding:NSUTF8StringEncoding];
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(data.bytes, (CC_LONG)data.length, digest);
+    NSMutableString *hex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+    for (NSUInteger i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) [hex appendFormat:@"%02x", digest[i]];
+    return hex;
+}
+
+static NSString *MWPhotoBlurCachePath(NSURL *url, CGFloat radius) {
+    NSString *prefix = MWPhotoBlurCachePrefix(url);
+    if (!prefix) return nil;
+    NSString *radiusKey = [NSString stringWithFormat:@"%.3f", radius];
+    return [[MWPhotoBlurCacheDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_%@.jpg", prefix, radiusKey]] copy];
+}
+
+static UIImage *MWPhotoReadBlurCache(NSString *path) {
+    UIImage *decoded = [UIImage imageWithContentsOfFile:path];
+    if (!decoded.CGImage) return nil;
+    NSDictionary *metadata = [NSDictionary dictionaryWithContentsOfFile:[path stringByAppendingPathExtension:@"plist"]];
+    CGFloat scale = [metadata[@"scale"] doubleValue];
+    UIImageOrientation orientation = metadata ? [metadata[@"orientation"] integerValue] : decoded.imageOrientation;
+    if (scale <= 0) scale = decoded.scale;
+    return [UIImage imageWithCGImage:decoded.CGImage scale:scale orientation:orientation];
+}
+
+static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
+    if (!image || !path) return;
+    NSString *directory = [path stringByDeletingLastPathComponent];
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
+    NSData *data = UIImageJPEGRepresentation(image, 0.94);
+    if (!data || ![data writeToFile:path options:NSDataWritingAtomic error:nil]) return;
+    NSDictionary *metadata = @{@"scale": @(image.scale), @"orientation": @(image.imageOrientation)};
+    [metadata writeToFile:[path stringByAppendingPathExtension:@"plist"] atomically:YES];
+}
 
 @interface MWPhoto () {
 
@@ -22,6 +82,7 @@
     id <SDWebImageOperation> _webImageOperation;
     PHImageRequestID _assetRequestID;
     PHImageRequestID _assetVideoRequestID;
+    NSUInteger _loadGeneration;
         
 }
 
@@ -29,8 +90,10 @@
 @property (nonatomic, strong) NSURL *photoURL;
 @property (nonatomic, strong) PHAsset *asset;
 @property (nonatomic) CGSize assetTargetSize;
-
+@property (nonatomic, strong) UIImage *sourceImage;
 - (void)imageLoadingComplete;
+- (void)completeLoadingWithImage:(UIImage *)image generation:(NSUInteger)generation;
+- (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation;
 
 @end
 
@@ -40,12 +103,50 @@
 
 #pragma mark - Class Methods
 
++ (void)clearBlurCache {
+    [self clearBlurCacheWithCompletion:nil];
+}
+
++ (void)clearBlurCacheForURL:(NSURL *)url {
+    [self clearBlurCacheForURL:url completion:nil];
+}
+
++ (void)clearBlurCacheWithCompletion:(void (^)(void))completion {
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        [[NSFileManager defaultManager] removeItemAtPath:MWPhotoBlurCacheDirectory() error:nil];
+        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
+    });
+}
+
++ (void)clearBlurCacheForURL:(NSURL *)url completion:(void (^)(void))completion {
+    NSString *prefix = MWPhotoBlurCachePrefix(url);
+    if (!prefix) {
+        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
+        return;
+    }
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        NSString *directory = MWPhotoBlurCacheDirectory();
+        NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:directory error:nil];
+        NSString *filePrefix = [prefix stringByAppendingString:@"_"];
+        for (NSString *file in files) {
+            if ([file hasPrefix:filePrefix]) {
+                [[NSFileManager defaultManager] removeItemAtPath:[directory stringByAppendingPathComponent:file] error:nil];
+            }
+        }
+        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
+    });
+}
+
 + (MWPhoto *)photoWithImage:(UIImage *)image {
 	return [[MWPhoto alloc] initWithImage:image];
 }
 
 + (MWPhoto *)photoWithURL:(NSURL *)url {
     return [[MWPhoto alloc] initWithURL:url];
+}
+
++ (MWPhoto *)photoWithURL:(NSURL *)url isBlur:(BOOL)isBlur {
+    return [[MWPhoto alloc] initWithURL:url isBlur:isBlur];
 }
 
 + (MWPhoto *)photoWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize {
@@ -82,6 +183,16 @@
     return self;
 }
 
+- (id)initWithURL:(NSURL *)url isBlur:(BOOL)isBlur {
+    if ((self = [super init])) {
+        self.photoURL = url;
+        self.isBlur = isBlur;
+        self.radius = 30.0;
+        [self setup];
+    }
+    return self;
+}
+
 - (id)initWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize {
     if ((self = [super init])) {
         self.asset = asset;
@@ -105,6 +216,7 @@
 - (void)setup {
     _assetRequestID = PHInvalidImageRequestID;
     _assetVideoRequestID = PHInvalidImageRequestID;
+    if (_radius <= 0) _radius = 30.0;
 }
 
 - (void)dealloc {
@@ -148,10 +260,49 @@
     return _underlyingImage;
 }
 
+- (void)setIsBlur:(BOOL)isBlur {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ self.isBlur = isBlur; });
+        return;
+    }
+    if (_isBlur == isBlur) return;
+    _isBlur = isBlur;
+
+    // A source image is retained while loaded, so entitlement changes can switch
+    // between the original and blurred rendering without replacing the URL/model.
+    UIImage *source = self.sourceImage ?: self.underlyingImage;
+    if (!source) return; // An in-flight fetch will use the updated flag on completion.
+    self.sourceImage = source;
+    NSUInteger generation = ++_loadGeneration;
+    _loadingInProgress = YES;
+    if (isBlur) {
+        [self processSourceImage:source generation:generation];
+    } else {
+        self.underlyingImage = source;
+        [self imageLoadingComplete];
+    }
+}
+
+- (void)setRadius:(CGFloat)radius {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ self.radius = radius; });
+        return;
+    }
+    CGFloat normalizedRadius = isfinite(radius) && radius > 0 ? radius : 30.0;
+    if (fabs(_radius - normalizedRadius) < 0.001) return;
+    _radius = normalizedRadius;
+    if (_isBlur && self.sourceImage) {
+        NSUInteger generation = ++_loadGeneration;
+        _loadingInProgress = YES;
+        [self processSourceImage:self.sourceImage generation:generation];
+    }
+}
+
 - (void)loadUnderlyingImageAndNotify {
     NSAssert([[NSThread currentThread] isMainThread], @"This method must be called on the main thread.");
     if (_loadingInProgress) return;
     _loadingInProgress = YES;
+    _loadGeneration++;
     @try {
         if (self.underlyingImage) {
             [self imageLoadingComplete];
@@ -175,8 +326,7 @@
     if (_image) {
         
         // We have UIImage!
-        self.underlyingImage = _image;
-        [self imageLoadingComplete];
+        [self completeLoadingWithImage:_image generation:_loadGeneration];
         
     } else if (_photoURL) {
         
@@ -186,7 +336,7 @@
             // Load from assets library
             [self _performLoadUnderlyingImageAndNotifyWithAssetsLibraryURL: _photoURL];
             
-        } else if ([_photoURL isFileReferenceURL]) {
+        } else if ([_photoURL isFileURL]) {
             
             // Load from local file async
             [self _performLoadUnderlyingImageAndNotifyWithLocalFileURL: _photoURL];
@@ -213,6 +363,7 @@
 
 // Load from local file
 - (void)_performLoadUnderlyingImageAndNotifyWithWebURL:(NSURL *)url {
+    NSUInteger generation = _loadGeneration;
     @try {
         SDWebImageManager *manager = [SDWebImageManager sharedManager];
         _webImageOperation = [manager loadImageWithURL:url options:0 progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
@@ -227,12 +378,10 @@
             if (error) {
                 MWLog(@"SDWebImage failed to download image: %@", error);
             }
+            if (!finished) return;
             // 显式 self 表明 block 有意引用，消除隐式 retain 警告（该 block 为一次性回调，无循环引用）
             self->_webImageOperation = nil;
-            self.underlyingImage = image;
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self imageLoadingComplete];
-            });
+            [self completeLoadingWithImage:image generation:generation];
         }];
     } @catch (NSException *e) {
         MWLog(@"Photo from web: %@", e);
@@ -243,19 +392,18 @@
 
 // Load from local file
 - (void)_performLoadUnderlyingImageAndNotifyWithLocalFileURL:(NSURL *)url {
+    NSUInteger generation = _loadGeneration;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         @autoreleasepool {
             @try {
-                self.underlyingImage = [UIImage imageWithContentsOfFile:url.path];
-                // 显式 self 表明 block 有意引用，消除隐式 retain 警告
-                if (!self.underlyingImage) {
+                UIImage *image = [UIImage imageWithContentsOfFile:url.path];
+                if (!image) {
                     MWLog(@"Error loading photo from path: %@", url.path);
                 }
-            } @finally {
-                // 回到主线程回调，等价于 performSelectorOnMainThread:waitUntilDone:NO
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [self imageLoadingComplete];
-                });
+                [self completeLoadingWithImage:image generation:generation];
+            } @catch (NSException *exception) {
+                MWLog(@"Error loading photo from path: %@ (%@)", url.path, exception);
+                [self completeLoadingWithImage:nil generation:generation];
             }
         }
     });
@@ -265,6 +413,7 @@
 // 旧的 ALAssetsLibrary（iOS 9 废弃）替换为 Photos 框架：
 // 先通过 Apple 官方的 ALAsset URL 桥接方法查出 PHAsset，再由 PHImageManager 加载全屏图
 - (void)_performLoadUnderlyingImageAndNotifyWithAssetsLibraryURL:(NSURL *)url {
+    NSUInteger generation = _loadGeneration;
     @try {
         // 根据旧 assets-library URL 查找对应的 PHAsset（官方桥接 API）
         // 该桥接方法自 iOS 11 被标记废弃，但它是消费旧 assets-library URL 的唯一途径，
@@ -277,9 +426,8 @@
         PHAsset *asset = fetchResult.firstObject;
         if (!asset) {
             // 未找到资源，等价旧 failureBlock 分支
-            self.underlyingImage = nil;
             MWLog(@"Photo from asset library error: asset not found");
-            [self imageLoadingComplete];
+            [self completeLoadingWithImage:nil generation:generation];
             return;
         }
 
@@ -299,24 +447,21 @@
 
             NSError *error = info[PHImageErrorKey];
             if (error) {
-                self.underlyingImage = nil;
                 MWLog(@"Photo from asset library error: %@", error);
-            } else {
-                self.underlyingImage = result;
             }
-            // resultHandler 默认在主线程回调，直接执行完成处理
-            [self imageLoadingComplete];
+            [self completeLoadingWithImage:(error ? nil : result) generation:generation];
         }];
     } @catch (NSException *e) {
         MWLog(@"Photo from asset library error: %@", e);
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self imageLoadingComplete];
+            if (generation == self->_loadGeneration) [self imageLoadingComplete];
         });
     }
 }
 
 // Load from photos library
 - (void)_performLoadUnderlyingImageAndNotifyWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize {
+    NSUInteger generation = _loadGeneration;
     
     PHImageManager *imageManager = [PHImageManager defaultManager];
     
@@ -333,17 +478,49 @@
     };
     
     _assetRequestID = [imageManager requestImageForAsset:asset targetSize:targetSize contentMode:PHImageContentModeAspectFit options:options resultHandler:^(UIImage *result, NSDictionary *info) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.underlyingImage = result;
-            [self imageLoadingComplete];
-        });
+        if ([info[PHImageResultIsDegradedKey] boolValue]) return;
+        [self completeLoadingWithImage:result generation:generation];
     }];
 
 }
 
+/// 统一处理全部来源的图片：模糊运算放到后台线程执行。
+- (void)completeLoadingWithImage:(UIImage *)image generation:(NSUInteger)generation {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (generation != self->_loadGeneration) return;
+        self.sourceImage = image;
+        if (!image || !self.isBlur) {
+            self.underlyingImage = image;
+            [self imageLoadingComplete];
+        } else {
+            [self processSourceImage:image generation:generation];
+        }
+    });
+}
+
+- (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation {
+    CGFloat radius = self.radius > 0 ? self.radius : 30.0;
+    NSString *cachePath = MWPhotoBlurCachePath(self.photoURL, radius);
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        @autoreleasepool {
+            UIImage *blurredImage = cachePath ? MWPhotoReadBlurCache(cachePath) : nil;
+            if (!blurredImage) {
+                blurredImage = [UIImage gaussianBlurWithImage:image ofRadius:radius];
+                if (cachePath && blurredImage && blurredImage != image) MWPhotoWriteBlurCache(blurredImage, cachePath);
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (generation != self->_loadGeneration || !self.isBlur) return;
+                self.underlyingImage = blurredImage ?: image;
+                [self imageLoadingComplete];
+            });
+        }
+    });
+}
+
 // Release if we can get it again from path or url
 - (void)unloadUnderlyingImage {
-    _loadingInProgress = NO;
+	[self cancelAnyLoading];
+	self.sourceImage = nil;
 	self.underlyingImage = nil;
 }
 
@@ -364,6 +541,8 @@
 }
 
 - (void)cancelAnyLoading {
+    _loadGeneration++;
+    _loadingInProgress = NO;
     if (_webImageOperation != nil) {
         [_webImageOperation cancel];
         _loadingInProgress = NO;
