@@ -20,7 +20,7 @@
     MWPhotoBrowser __weak *_photoBrowser;
 	MWTapDetectingView *_tapView; // for background taps
 	MWTapDetectingImageView *_photoImageView;
-	DACircularProgressView *_loadingIndicator;
+	UIView *_loadingIndicator;
     UIImageView *_loadingError;
     
 }
@@ -53,10 +53,16 @@
 		[self addSubview:_photoImageView];
 		
 		// Loading indicator
-		_loadingIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(140.0f, 30.0f, 40.0f, 40.0f)];
+		_loadingIndicator = browser.loadingViewProvider ? browser.loadingViewProvider(self) : nil;
+        if (!_loadingIndicator) {
+            DACircularProgressView *defaultIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
+            defaultIndicator.thicknessRatio = 0.1;
+            defaultIndicator.roundedCorners = NO;
+            _loadingIndicator = defaultIndicator;
+        } else if (_loadingIndicator.bounds.size.width <= 0 || _loadingIndicator.bounds.size.height <= 0) {
+            _loadingIndicator.frame = CGRectMake(0, 0, 40.0f, 40.0f);
+        }
         _loadingIndicator.userInteractionEnabled = NO;
-        _loadingIndicator.thicknessRatio = 0.1;
-        _loadingIndicator.roundedCorners = NO;
 		_loadingIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin |
         UIViewAutoresizingFlexibleBottomMargin | UIViewAutoresizingFlexibleRightMargin;
 		[self addSubview:_loadingIndicator];
@@ -204,7 +210,10 @@
         if (photoWithProgress == self.photo) {
             float progress = [[dict valueForKey:@"progress"] floatValue];
             // 显式 self 消除 block 隐式 retain 警告
-            self->_loadingIndicator.progress = MAX(MIN(1, progress), 0);
+            CGFloat normalizedProgress = MAX(MIN(1, progress), 0);
+            if ([self->_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
+                [(id<MWPhotoBrowserLoadingView>)self->_loadingIndicator setProgress:normalizedProgress];
+            }
         }
     });
 }
@@ -219,7 +228,9 @@
     self.minimumZoomScale = 1;
     self.maximumZoomScale = 1;
     self.zoomScale = 1;
-    _loadingIndicator.progress = 0;
+    if ([_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
+        [(id<MWPhotoBrowserLoadingView>)_loadingIndicator setProgress:0];
+    }
     _loadingIndicator.hidden = NO;
     [self hideImageFailure];
 }

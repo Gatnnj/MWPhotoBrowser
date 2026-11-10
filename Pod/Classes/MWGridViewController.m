@@ -173,8 +173,8 @@
         cell = [[MWGridCell alloc] init];
     }
     id <MWPhoto> photo = [_browser thumbPhotoAtIndex:indexPath.row];
-    cell.photo = photo;
     cell.gridController = self;
+    cell.photo = photo;
     cell.selectionMode = _selectionMode;
     cell.isSelected = [_browser photoIsSelectedAtIndex:indexPath.row];
     cell.index = indexPath.row;

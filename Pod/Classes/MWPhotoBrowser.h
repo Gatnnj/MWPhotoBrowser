@@ -20,6 +20,12 @@
 
 @class MWPhotoBrowser;
 
+/// Optional progress hook for custom loading views. Views without this method can show an indeterminate animation.
+@protocol MWPhotoBrowserLoadingView <NSObject>
+@optional
+- (void)setProgress:(CGFloat)progress;
+@end
+
 @protocol MWPhotoBrowserDelegate <NSObject>
 
 - (NSUInteger)numberOfPhotosInPhotoBrowser:(MWPhotoBrowser *)photoBrowser;
@@ -66,6 +72,12 @@
 // Icon should be located in the app's main bundle
 @property (nonatomic, strong) NSString *customImageSelectedIconName;
 @property (nonatomic, strong) NSString *customImageSelectedSmallIconName;
+
+/// Optional factory for loading indicators used by zoom pages and grid cells.
+/// Return a new configured view, or nil to use the built-in progress indicator.
+/// The returned view is centered in the supplied container and hidden when loading finishes.
+/// Custom views may implement -setProgress: to receive download progress from 0 to 1.
+@property (nonatomic, copy) UIView * _Nullable (^loadingViewProvider)(UIView *container);
 
 // Init
 - (id)initWithPhotos:(NSArray *)photosArray;

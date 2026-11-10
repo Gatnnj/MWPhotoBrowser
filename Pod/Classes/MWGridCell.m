@@ -19,7 +19,7 @@
     UIImageView *_imageView;
     UIImageView *_videoIndicator;
     UIImageView *_loadingError;
-	DACircularProgressView *_loadingIndicator;
+	UIView *_loadingIndicator;
     UIButton *_selectedButton;
     
 }
@@ -63,12 +63,6 @@
         [self addSubview:_selectedButton];
     
 		// Loading indicator
-		_loadingIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
-        _loadingIndicator.userInteractionEnabled = NO;
-        _loadingIndicator.thicknessRatio = 0.1;
-        _loadingIndicator.roundedCorners = NO;
-		[self addSubview:_loadingIndicator];
-        
         // Listen for photo loading notifications
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(setProgressFromNotification:)
@@ -89,10 +83,29 @@
 
 - (void)setGridController:(MWGridViewController *)gridController {
     _gridController = gridController;
+    [self ensureLoadingIndicator];
     // Set custom selection image if required
     if (_gridController.browser.customImageSelectedSmallIconName) {
         [_selectedButton setImage:[UIImage imageNamed:_gridController.browser.customImageSelectedSmallIconName] forState:UIControlStateSelected];
     }
+}
+
+- (void)ensureLoadingIndicator {
+    if (_loadingIndicator) return;
+    UIView *customView = _gridController.browser.loadingViewProvider ? _gridController.browser.loadingViewProvider(self) : nil;
+    if (customView) {
+        _loadingIndicator = customView;
+        if (_loadingIndicator.bounds.size.width <= 0 || _loadingIndicator.bounds.size.height <= 0) {
+            _loadingIndicator.frame = CGRectMake(0, 0, 40.0f, 40.0f);
+        }
+    } else {
+        DACircularProgressView *defaultIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
+        defaultIndicator.thicknessRatio = 0.1;
+        defaultIndicator.roundedCorners = NO;
+        _loadingIndicator = defaultIndicator;
+    }
+    _loadingIndicator.userInteractionEnabled = NO;
+    [self addSubview:_loadingIndicator];
 }
 
 #pragma mark - View
@@ -114,7 +127,9 @@
     _photo = nil;
     _gridController = nil;
     _imageView.image = nil;
-    _loadingIndicator.progress = 0;
+    if ([_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
+        [(id<MWPhotoBrowserLoadingView>)_loadingIndicator setProgress:0];
+    }
     _selectedButton.hidden = YES;
     [self hideImageFailure];
     [super prepareForReuse];
@@ -123,6 +138,7 @@
 #pragma mark - Image Handling
 
 - (void)setPhoto:(id <MWPhoto>)photo {
+    [self ensureLoadingIndicator];
     _photo = photo;
     if ([photo respondsToSelector:@selector(isVideo)]) {
         _videoIndicator.hidden = !photo.isVideo;
@@ -191,7 +207,9 @@
 }
 
 - (void)showLoadingIndicator {
-    _loadingIndicator.progress = 0;
+    if ([_loadingIndicator isKindOfClass:[DACircularProgressView class]]) {
+        ((DACircularProgressView *)_loadingIndicator).progress = 0;
+    }
     _loadingIndicator.hidden = NO;
     [self hideImageFailure];
 }
@@ -232,7 +250,10 @@
         if (photoWithProgress == self->_photo) {
 //            NSLog(@"%f", [[dict valueForKey:@"progress"] floatValue]);
             float progress = [[dict valueForKey:@"progress"] floatValue];
-            self->_loadingIndicator.progress = MAX(MIN(1, progress), 0);
+            CGFloat normalizedProgress = MAX(MIN(1, progress), 0);
+            if ([self->_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
+                [(id<MWPhotoBrowserLoadingView>)self->_loadingIndicator setProgress:normalizedProgress];
+            }
         }
     });
 }
