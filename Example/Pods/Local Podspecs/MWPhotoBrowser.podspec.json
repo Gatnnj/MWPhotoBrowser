@@ -22,12 +22,12 @@
     "tag": "2.1.2"
   },
   "platforms": {
-    "ios": "15.0"
+    "ios": "13.0"
   },
   "source_files": "Pod/Classes/**/*",
   "resource_bundles": {
     "MWPhotoBrowser": [
-      "Pod/Assets/*.png"
+      "Pod/Assets/*.xcassets"
     ]
   },
   "requires_arc": true,

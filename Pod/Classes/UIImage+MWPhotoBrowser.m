@@ -11,10 +11,92 @@
 #import <CoreImage/CoreImage.h>
 #import <math.h>
 
+/// resource bundle 基础名，与 podspec 中 s.resource_bundles 的 key 保持一致
+static NSString * const kMWResourceBundleName = @"MWPhotoBrowser";
+
 @implementation UIImage (MWPhotoBrowser)
 
+#pragma mark - Resource Bundle
+
++ (NSBundle *)mw_resourceBundle {
+    static NSBundle *resourceBundle = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        // bundle 名在不同集成方式下不一样，按优先级枚举：
+        // 1. CocoaPods / 手写 XCFramework：MWPhotoBrowser.bundle
+        // 2. CocoaPods 早期版本会带 pod 名前缀：MWPhotoBrowser-MWPhotoBrowser.bundle
+        // 3. SwiftPM 生成的是 <Package>_<Target>.bundle
+        NSArray<NSString *> *candidateNames = @[
+            kMWResourceBundleName,
+            [NSString stringWithFormat:@"%@-%@", kMWResourceBundleName, kMWResourceBundleName],
+            [NSString stringWithFormat:@"%@_%@", kMWResourceBundleName, kMWResourceBundleName]
+        ];
+
+        // 宿主 bundle：动态 framework / XCFramework 在自身 bundle 内找到内嵌的 resource bundle；
+        // 静态库（use_frameworks! 未开启）位于 app 根目录，即 mainBundle。
+        Class ownerClass = NSClassFromString(@"MWPhotoBrowser");
+        NSMutableArray<NSBundle *> *hostBundles = [NSMutableArray array];
+        if (ownerClass) {
+            [hostBundles addObject:[NSBundle bundleForClass:ownerClass]];
+        }
+        [hostBundles addObject:[NSBundle mainBundle]];
+
+        for (NSBundle *host in hostBundles) {
+            for (NSString *candidate in candidateNames) {
+                NSString *path = [host pathForResource:candidate ofType:@"bundle"];
+                if (path.length == 0) continue;
+                NSBundle *found = [NSBundle bundleWithPath:path];
+                if (found) {
+                    resourceBundle = found;
+                    return;
+                }
+            }
+        }
+
+        // 兜底：源码与 xcassets 被宿主 target 直接引用（资源编进宿主 Assets.car）
+        resourceBundle = [NSBundle mainBundle];
+    });
+    return resourceBundle;
+}
+
++ (UIImage *)mw_imageNamed:(NSString *)name {
+    if (name.length == 0) return nil;
+
+    NSBundle *bundle = [self mw_resourceBundle];
+    UIImage *image = [UIImage imageNamed:name inBundle:bundle compatibleWithTraitCollection:nil];
+    if (image) return image;
+
+    // 资源 bundle 缺失时回退宿主 mainBundle，避免图标整体空白
+    if (![bundle isEqual:[NSBundle mainBundle]]) {
+        image = [UIImage imageNamed:name inBundle:[NSBundle mainBundle] compatibleWithTraitCollection:nil];
+    }
+    return image;
+}
+
 + (UIImage *)imageForResourcePath:(NSString *)path ofType:(NSString *)type inBundle:(NSBundle *)bundle {
-    return [UIImage imageWithContentsOfFile:[bundle pathForResource:path ofType:type]];
+    if (path.length == 0) return nil;
+
+    // 兼容历史写法 "MWPhotoBrowser.bundle/ImageError"：只取最后一段作为资源名
+    NSString *name = [path lastPathComponent];
+
+    // 调用方显式传入 bundle 时沿用其语义；传入 mainBundle（老代码传 bundleForClass 的典型结果）
+    // 或未传时，统一走库自己的资源 bundle。
+    NSBundle *searchBundle = bundle;
+    if (!searchBundle || [searchBundle isEqual:[NSBundle mainBundle]]) {
+        searchBundle = [self mw_resourceBundle];
+    }
+
+    UIImage *image = [UIImage imageNamed:name inBundle:searchBundle compatibleWithTraitCollection:nil];
+    if (image) return image;
+
+    // 资源目录里仍是散装文件（未进 Assets.car）时按文件名兜底
+    if (type.length > 0) {
+        NSString *filePath = [searchBundle pathForResource:name ofType:type];
+        if (filePath.length > 0) {
+            image = [UIImage imageWithContentsOfFile:filePath];
+        }
+    }
+    return image ?: [self mw_imageNamed:name];
 }
 
 + (UIImage *)clearImageWithSize:(CGSize)size {
