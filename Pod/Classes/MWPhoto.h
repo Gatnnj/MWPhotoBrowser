@@ -24,7 +24,8 @@
 @property (nonatomic) BOOL isBlur;
 /// 高斯模糊半径，默认 30；图片已加载时修改也会重新处理。
 @property (nonatomic) CGFloat radius;
-
+/// 是否压缩图片
+@property (nonatomic) BOOL isZoom;
 
 + (MWPhoto *)photoWithImage:(UIImage *)image;
 + (MWPhoto *)photoWithURL:(NSURL *)url;
@@ -39,6 +40,14 @@
 /// Asynchronously remove generated blur files for a URL, at every radius.
 + (void)clearBlurCacheForURL:(NSURL *)url;
 + (void)clearBlurCacheForURL:(NSURL *)url completion:(void (^)(void))completion;
+/// Remove generated grid thumbnail files from the caches directory, or for one URL.
++ (void)clearZoomCache;
++ (void)clearZoomCacheWithCompletion:(void (^)(void))completion;
++ (void)clearZoomCacheForURL:(NSURL *)url;
++ (void)clearZoomCacheForURL:(NSURL *)url completion:(void (^)(void))completion;
+/// Asynchronously clear both generated blur and grid thumbnail caches.
++ (void)clearBlurAndZoomCache;
++ (void)clearBlurAndZoomCacheWithCompletion:(void (^)(void))completion;
 
 - (id)init;
 - (id)initWithImage:(UIImage *)image;

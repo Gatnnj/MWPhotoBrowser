@@ -141,7 +141,12 @@
 }
 
 - (void)displayImage {
-    _imageView.image = [_photo underlyingImage];
+    UIImage *gridImage = nil;
+    if ([_photo respondsToSelector:@selector(isZoom)] && _photo.isZoom &&
+        [_photo respondsToSelector:@selector(gridThumbnailImage)]) {
+        gridImage = _photo.gridThumbnailImage;
+    }
+    _imageView.image = gridImage ?: [_photo underlyingImage];
     _selectedButton.hidden = !_selectionMode;
     [self hideImageFailure];
 }

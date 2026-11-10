@@ -6,7 +6,7 @@
 //
 //
 
-#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
 @interface UIImage (MWPhotoBrowser)
 
@@ -17,6 +17,9 @@
 
 /// 压缩图片
 + (NSData *)mwCompressImage:(UIImage *)image;
+
+/// 生成适合浏览展示的 JPEG 缩略图：最长边不超过 1280 像素，目标文件大小约 300 KB。
++ (nullable NSData *)mwCompressImageForThumbnail:(UIImage *)image;
 
 /// @maskName 水印名
 + (NSData *)mwCompressImage:(UIImage *)image withMask:(NSString *)maskName;

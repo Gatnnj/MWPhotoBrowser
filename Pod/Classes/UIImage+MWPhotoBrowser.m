@@ -73,6 +73,66 @@ static char customImageName;
 + (NSData *)mwCompressImage:(UIImage *)image {
     return [self mwCompressImage:image withMask:nil];
 }
+
++ (NSData *)mwCompressImageForThumbnail:(UIImage *)image {
+    if (![image isKindOfClass:[UIImage class]] || image.size.width <= 0 || image.size.height <= 0) {
+        return nil;
+    }
+
+    // 根据像素尺寸缩放，避免高 scale UIImage 被误当成低分辨率图片。
+    CGFloat sourceScale = image.scale > 0 ? image.scale : 1.0;
+    CGFloat sourcePixelWidth = image.size.width * sourceScale;
+    CGFloat sourcePixelHeight = image.size.height * sourceScale;
+    CGFloat maxPixelDimension = 1280.0;
+    CGFloat resizeRatio = MIN(1.0, maxPixelDimension / MAX(sourcePixelWidth, sourcePixelHeight));
+    CGSize outputSize = CGSizeMake(MAX(1.0, round(image.size.width * sourceScale * resizeRatio)),
+                                   MAX(1.0, round(image.size.height * sourceScale * resizeRatio)));
+
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.scale = 1.0;
+    format.opaque = YES; // JPEG 无透明通道；透明区域以白色为底。
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:outputSize format:format];
+    UIImage *thumbnail = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull context) {
+        [[UIColor whiteColor] setFill];
+        [context fillRect:(CGRect){CGPointZero, outputSize}];
+        [image drawInRect:(CGRect){CGPointZero, outputSize}];
+    }];
+    if (!thumbnail) {
+        return nil;
+    }
+
+    // 在固定缩略图尺寸上搜索尽可能高且不超过约 300 KB 的 JPEG 质量，限制编码次数。
+    const NSUInteger targetBytes = 300 * 1024;
+    CGFloat lowQuality = 0.35;
+    CGFloat highQuality = 0.82;
+    NSData *bestData = UIImageJPEGRepresentation(thumbnail, lowQuality);
+    if (!bestData) {
+        return nil;
+    }
+    NSData *highData = UIImageJPEGRepresentation(thumbnail, highQuality);
+    if (!highData) {
+        return bestData;
+    }
+    if (highData.length <= targetBytes) {
+        return highData;
+    }
+
+    for (NSUInteger attempt = 0; attempt < 6; attempt++) {
+        CGFloat quality = (lowQuality + highQuality) / 2.0;
+        NSData *candidate = UIImageJPEGRepresentation(thumbnail, quality);
+        if (!candidate) {
+            break;
+        }
+        if (candidate.length <= targetBytes) {
+            bestData = candidate;
+            lowQuality = quality;
+        } else {
+            highQuality = quality;
+        }
+    }
+    return bestData;
+}
+
 + (NSData *)mwCompressImage:(UIImage *)image withMask:(NSString *)maskName {
     
     double size;

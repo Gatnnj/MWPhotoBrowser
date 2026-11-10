@@ -14,6 +14,7 @@
 // AssetsLibrary（iOS 9 废弃）替换为 Photos 框架
 #import <Photos/Photos.h>
 #import <CommonCrypto/CommonDigest.h>
+#import <ImageIO/ImageIO.h>
 #import <math.h>
 #import "MWPhoto.h"
 #import "MWPhotoBrowser.h"
@@ -56,6 +57,30 @@ static NSString *MWPhotoBlurCachePath(NSURL *url, CGFloat radius) {
     return [[MWPhotoBlurCacheDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_%@.jpg", prefix, radiusKey]] copy];
 }
 
+static NSString *MWPhotoZoomCacheDirectory(void) {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    return [[paths.firstObject stringByAppendingPathComponent:@"MWPhotoBrowserZoomCache"] copy];
+}
+
+static NSString *MWPhotoZoomCachePath(NSURL *url) {
+    NSString *prefix = MWPhotoBlurCachePrefix(url);
+    return prefix ? [[MWPhotoZoomCacheDirectory() stringByAppendingPathComponent:[prefix stringByAppendingString:@".jpg"]] copy] : nil;
+}
+
+static UIImage *MWPhotoDecodeZoomData(NSData *data) {
+    if (!data.length) return nil;
+    CGImageSourceRef source = CGImageSourceCreateWithData((__bridge CFDataRef)data, NULL);
+    if (!source) return nil;
+    NSDictionary *options = @{(id)kCGImageSourceShouldCache: @YES,
+                              (id)kCGImageSourceShouldCacheImmediately: @YES};
+    CGImageRef cgImage = CGImageSourceCreateImageAtIndex(source, 0, (__bridge CFDictionaryRef)options);
+    CFRelease(source);
+    if (!cgImage) return nil;
+    UIImage *image = [UIImage imageWithCGImage:cgImage scale:1.0 orientation:UIImageOrientationUp];
+    CGImageRelease(cgImage);
+    return image;
+}
+
 static UIImage *MWPhotoReadBlurCache(NSString *path) {
     UIImage *decoded = [UIImage imageWithContentsOfFile:path];
     if (!decoded.CGImage) return nil;
@@ -91,9 +116,12 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 @property (nonatomic, strong) PHAsset *asset;
 @property (nonatomic) CGSize assetTargetSize;
 @property (nonatomic, strong) UIImage *sourceImage;
+@property (nonatomic, strong) UIImage *gridThumbnailImage;
 - (void)imageLoadingComplete;
 - (void)completeLoadingWithImage:(UIImage *)image generation:(NSUInteger)generation;
 - (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation;
+- (void)processGridThumbnailFromImage:(UIImage *)image generation:(NSUInteger)generation completion:(void (^)(void))completion;
+- (void)finishLoadingSourceImage:(UIImage *)image generation:(NSUInteger)generation;
 
 @end
 
@@ -133,6 +161,46 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
                 [[NSFileManager defaultManager] removeItemAtPath:[directory stringByAppendingPathComponent:file] error:nil];
             }
         }
+        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
+    });
+}
+
++ (void)clearZoomCache {
+    [self clearZoomCacheWithCompletion:nil];
+}
+
++ (void)clearZoomCacheWithCompletion:(void (^)(void))completion {
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        [[NSFileManager defaultManager] removeItemAtPath:MWPhotoZoomCacheDirectory() error:nil];
+        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
+    });
+}
+
++ (void)clearZoomCacheForURL:(NSURL *)url {
+    [self clearZoomCacheForURL:url completion:nil];
+}
+
++ (void)clearZoomCacheForURL:(NSURL *)url completion:(void (^)(void))completion {
+    NSString *path = MWPhotoZoomCachePath(url);
+    if (!path) {
+        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
+        return;
+    }
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
+    });
+}
+
++ (void)clearBlurAndZoomCache {
+    [self clearBlurAndZoomCacheWithCompletion:nil];
+}
+
++ (void)clearBlurAndZoomCacheWithCompletion:(void (^)(void))completion {
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        [fileManager removeItemAtPath:MWPhotoBlurCacheDirectory() error:nil];
+        [fileManager removeItemAtPath:MWPhotoZoomCacheDirectory() error:nil];
         if (completion) dispatch_async(dispatch_get_main_queue(), completion);
     });
 }
@@ -296,6 +364,31 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
         _loadingInProgress = YES;
         [self processSourceImage:self.sourceImage generation:generation];
     }
+}
+
+- (void)setIsZoom:(BOOL)isZoom {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ self.isZoom = isZoom; });
+        return;
+    }
+    if (_isZoom == isZoom) return;
+    _isZoom = isZoom;
+    if (!isZoom) {
+        self.gridThumbnailImage = nil;
+        UIImage *source = self.sourceImage ?: self.underlyingImage;
+        if (_loadingInProgress && source) {
+            NSUInteger generation = ++_loadGeneration;
+            [self finishLoadingSourceImage:source generation:generation];
+        }
+        return;
+    }
+    UIImage *source = self.sourceImage ?: self.underlyingImage;
+    if (!source) return; // The active image request will create the thumbnail on completion.
+    NSUInteger generation = ++_loadGeneration;
+    _loadingInProgress = YES;
+    [self processGridThumbnailFromImage:source generation:generation completion:^{
+        [self finishLoadingSourceImage:source generation:generation];
+    }];
 }
 
 - (void)loadUnderlyingImageAndNotify {
@@ -489,11 +582,47 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (generation != self->_loadGeneration) return;
         self.sourceImage = image;
-        if (!image || !self.isBlur) {
-            self.underlyingImage = image;
-            [self imageLoadingComplete];
+        if (image && self.isZoom) {
+            [self processGridThumbnailFromImage:image generation:generation completion:^{
+                [self finishLoadingSourceImage:image generation:generation];
+            }];
         } else {
-            [self processSourceImage:image generation:generation];
+            [self finishLoadingSourceImage:image generation:generation];
+        }
+    });
+}
+
+- (void)finishLoadingSourceImage:(UIImage *)image generation:(NSUInteger)generation {
+    if (generation != _loadGeneration) return;
+    if (!image || !self.isBlur) {
+        self.underlyingImage = image;
+        [self imageLoadingComplete];
+    } else {
+        [self processSourceImage:image generation:generation];
+    }
+}
+
+- (void)processGridThumbnailFromImage:(UIImage *)image generation:(NSUInteger)generation completion:(void (^)(void))completion {
+    NSString *cachePath = MWPhotoZoomCachePath(self.photoURL);
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        @autoreleasepool {
+            UIImage *thumbnail = cachePath ? MWPhotoDecodeZoomData([NSData dataWithContentsOfFile:cachePath]) : nil;
+            if (!thumbnail) {
+                NSData *data = [UIImage mwCompressImageForThumbnail:image];
+                if (data) {
+                    thumbnail = MWPhotoDecodeZoomData(data);
+                    if (cachePath && thumbnail) {
+                        NSString *directory = [cachePath stringByDeletingLastPathComponent];
+                        [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
+                        [data writeToFile:cachePath options:NSDataWritingAtomic error:nil];
+                    }
+                }
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (generation != self->_loadGeneration || !self.isZoom) return;
+                self.gridThumbnailImage = thumbnail;
+                if (completion) completion();
+            });
         }
     });
 }
@@ -521,6 +650,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 - (void)unloadUnderlyingImage {
 	[self cancelAnyLoading];
 	self.sourceImage = nil;
+	self.gridThumbnailImage = nil;
 	self.underlyingImage = nil;
 }
 

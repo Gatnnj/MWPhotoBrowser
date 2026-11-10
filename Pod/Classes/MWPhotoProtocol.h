@@ -8,6 +8,8 @@
 
 #import <Foundation/Foundation.h>
 
+@class UIImage;
+
 // Notifications
 #define MWPHOTO_LOADING_DID_END_NOTIFICATION @"MWPHOTO_LOADING_DID_END_NOTIFICATION"
 #define MWPHOTO_PROGRESS_NOTIFICATION @"MWPHOTO_PROGRESS_NOTIFICATION"
@@ -56,6 +58,9 @@
 
 // is Gaussian blur
 @property (nonatomic) BOOL isBlur;
+/// Optional compressed image used by the grid view when available.
+@property (nonatomic, readonly, nullable) UIImage *gridThumbnailImage;
+@property (nonatomic) BOOL isZoom;
 // default 30.0
 @property (nonatomic) CGFloat radius;
 
