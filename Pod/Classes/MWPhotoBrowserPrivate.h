@@ -41,6 +41,7 @@
 	// Navigation & controls
 	UIToolbar *_toolbar;
 	NSTimer *_controlVisibilityTimer;
+    dispatch_block_t _pendingTapToggleBlock; // 排队中的单击切换显隐，可被双击或退出取消
 	UIBarButtonItem *_previousButton, *_nextButton, *_actionButton, *_doneButton;
     MBProgressHUD *_progressHUD;
     
@@ -132,6 +133,9 @@
 - (void)setControlsHidden:(BOOL)hidden animated:(BOOL)animated permanent:(BOOL)permanent;
 - (void)toggleControls;
 - (BOOL)areControlsHidden;
+// 单击延迟切换控件显隐（可被双击 / 退出页面取消）
+- (void)scheduleToggleControlsFromTap;
+- (void)cancelPendingTapToggle;
 
 // Data
 - (NSUInteger)numberOfPhotos;

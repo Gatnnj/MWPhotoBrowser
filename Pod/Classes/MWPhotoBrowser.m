@@ -15,7 +15,6 @@
 #import "MWPhotoBrowserPrivate.h"
 #import "MWPhotoTransitionAnimator.h"
 #import "MWPhotoInteractiveTransition.h"
-#import "SDImageCache.h"
 #import "UIImage+MWPhotoBrowser.h"
 
 #define PADDING                  10
@@ -95,12 +94,18 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 }
 
 - (void)dealloc {
-    NSLog(@"%@ - dealloc", NSStringFromClass(self.class));
+    // 撤销排队中的单击切换显隐（block 只弱持有 self，这里取消是为了不再回调到已销毁对象）
+    [self cancelPendingTapToggle];
+    // 控件显隐定时器必须在这里断开：它持有 self，不断开会拖住整个视图树延迟释放
+    [self cancelControlHiding];
     [self clearCurrentVideo];
     _pagingScrollView.delegate = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self releaseAllUnderlyingPhotos:NO];
-    [[SDImageCache sharedImageCache] clearMemory]; // clear memory
+    // 不再调用 [[SDImageCache sharedImageCache] clearMemory]：
+    // sharedImageCache 是全局单例，在这里清会连带清掉宿主 App 其他页面的图片内存缓存，
+    // 关闭一个相册浏览器不该影响整个进程。内存压力交给 SDWebImage 自身的
+    // didReceiveMemoryWarning 监听处理。
 }
 
 - (void)releaseAllUnderlyingPhotos:(BOOL)preserveCurrent {
@@ -467,7 +472,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
     // Controls
     [self.navigationController.navigationBar.layer removeAllAnimations]; // Stop all animations on nav bar
-    [NSObject cancelPreviousPerformRequestsWithTarget:self]; // Cancel any pending toggles from taps
+    [NSObject cancelPreviousPerformRequestsWithTarget:self]; // 取消历史 performSelector 排队的调用
+    [self cancelPendingTapToggle]; // 撤销排队中的单击切换显隐，避免退出过渡期间控件又隐藏
     [self setControlsHidden:NO animated:NO permanent:YES];
     
     // 旧的 setStatusBarStyle 还原逻辑已移除：现代机制下系统会根据
@@ -1628,7 +1634,14 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 - (void)hideControlsAfterDelay {
 	if (![self areControlsHidden]) {
         [self cancelControlHiding];
-		_controlVisibilityTimer = [NSTimer scheduledTimerWithTimeInterval:self.delayToHideElements target:self selector:@selector(hideControls) userInfo:nil repeats:NO];
+        // 换成 block 版定时器 + weak self：timer 不再强持有 self，
+        // 控制器被 dismiss 时能立即释放，不必等这一次触发完
+        __weak typeof(self) weakSelf = self;
+		_controlVisibilityTimer = [NSTimer scheduledTimerWithTimeInterval:self.delayToHideElements
+                                                                 repeats:NO
+                                                                   block:^(NSTimer * _Nonnull timer) {
+            [weakSelf hideControls];
+        }];
 	}
 }
 
@@ -1636,6 +1649,33 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 - (void)hideControls { [self setControlsHidden:YES animated:YES permanent:NO]; }
 - (void)showControls { [self setControlsHidden:NO animated:YES permanent:NO]; }
 - (void)toggleControls { [self setControlsHidden:![self areControlsHidden] animated:YES permanent:NO]; }
+
+#pragma mark - Single Tap Scheduling
+
+- (void)scheduleToggleControlsFromTap {
+    // 单击延迟 0.2 秒切换控件显隐，给双击留出判定窗口。
+    // 使用可取消的 dispatch block：双击、开始拖拽或退出页面时能真正撤销这次排队，
+    // 避免缩放 / 返回后控件又闪一下。
+    [self cancelPendingTapToggle];
+
+    __weak typeof(self) weakSelf = self;
+    dispatch_block_t block = dispatch_block_create(DISPATCH_BLOCK_INHERIT_QOS_CLASS, ^{
+        typeof(self) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        strongSelf->_pendingTapToggleBlock = nil;
+        [strongSelf toggleControls];
+    });
+    _pendingTapToggleBlock = block;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), block);
+}
+
+- (void)cancelPendingTapToggle {
+    if (_pendingTapToggleBlock) {
+        dispatch_block_cancel(_pendingTapToggleBlock);
+        _pendingTapToggleBlock = nil;
+    }
+}
 
 #pragma mark - Properties
 

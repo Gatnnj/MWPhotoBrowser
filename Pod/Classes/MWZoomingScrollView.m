@@ -394,11 +394,13 @@
 }
 
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    [_photoBrowser cancelPendingTapToggle]; // 开始横向拖动，排队中的单击不应再切换显隐
 	[_photoBrowser cancelControlHiding];
 }
 
 - (void)scrollViewWillBeginZooming:(UIScrollView *)scrollView withView:(UIView *)view {
     self.scrollEnabled = YES; // reset
+    [_photoBrowser cancelPendingTapToggle]; // 捏合缩放同理
 	[_photoBrowser cancelControlHiding];
 }
 
@@ -414,12 +416,9 @@
 #pragma mark - Tap Detection
 
 - (void)handleSingleTap:(CGPoint)touchPoint {
-    // 旧实现 performSelector:afterDelay: 替换为 GCD，保持 0.2 秒延迟后切换控件显隐
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        // 显式 self 消除 block 隐式 retain 警告
-        [self->_photoBrowser toggleControls];
-    });
+    // 单击 / 双击的时序统一交给 browser 调度：延迟 0.2 秒切换控件显隐，
+    // 双击时由 handleDoubleTap 取消这次排队，避免缩放后工具栏再闪一下
+    [_photoBrowser scheduleToggleControlsFromTap];
 }
 
 - (void)handleDoubleTap:(CGPoint)touchPoint {
@@ -429,8 +428,8 @@
         return;
     }
 	
-	// Cancel any single tap handling
-	[NSObject cancelPreviousPerformRequestsWithTarget:_photoBrowser];
+	// 取消排队中的单击切换显隐（双击缩放后不应再闪一次工具栏）
+	[_photoBrowser cancelPendingTapToggle];
 	
 	// Zoom
 	if (self.zoomScale != self.minimumZoomScale && self.zoomScale != [self initialZoomScaleWithMinScale]) {
