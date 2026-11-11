@@ -27,7 +27,7 @@ Pod::Spec.new do |s|
     :git => 'https://github.com/mwaterfall/MWPhotoBrowser.git',
     :tag => '2.1.2'
   }
-  s.platform = :ios, '13.0'
+  s.platform = :ios, '15.0'
   s.source_files = 'Pod/Classes/**/*'
   # 图标统一收进 asset catalog：打包时由 actool 编译进 MWPhotoBrowser.bundle 的 Assets.car。
   # 好处是只保留一份源文件、自动匹配 @1x/@2x/@3x、支持 App Thinning / Dark Mode，
@@ -41,7 +41,7 @@ Pod::Spec.new do |s|
   # 替换为视频所需的 AVKit/AVFoundation，Photos 由弱框架改为强依赖
   s.frameworks = 'ImageIO', 'QuartzCore', 'AVKit', 'AVFoundation', 'Photos'
 
-  s.dependency 'MBProgressHUD', '~> 0.9'
+  s.dependency 'MBProgressHUD', '~> 1.2.0'
 
   # DACircularProgress 已移除：内置进度环改用 MWCircularProgressView
   # （CAShapeLayer + strokeEnd 实现），不再依赖第三方库

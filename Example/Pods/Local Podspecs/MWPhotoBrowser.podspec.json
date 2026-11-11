@@ -22,7 +22,7 @@
     "tag": "2.1.2"
   },
   "platforms": {
-    "ios": "13.0"
+    "ios": "15.0"
   },
   "source_files": "Pod/Classes/**/*",
   "resource_bundles": {
@@ -40,7 +40,7 @@
   ],
   "dependencies": {
     "MBProgressHUD": [
-      "~> 0.9"
+      "~> 1.2"
     ],
     "SDWebImage": [
       ">= 5.0.0"
