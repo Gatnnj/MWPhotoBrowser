@@ -484,11 +484,14 @@ static char customImageName;
     CGFloat yPoint   = 0;
     for (NSInteger index = 0; index < row*coloum; index++) {
         
-        xPoint = (index%coloum) *(width+100.0)-[UIScreen mainScreen].bounds.size.width;
+        // 以当前输出图尺寸（size）为错位基准。原先取 [UIScreen mainScreen].bounds，
+        // 在 iPad 分屏、Stage Manager、外接屏等场景下拿到的是整屏尺寸而非本次绘制区域，
+        // 会导致水印平铺错位。
+        xPoint = (index%coloum) *(width+100.0)-size.width;
         yPoint = (index/coloum) *(height+100.0);
         [str drawAtPoint:CGPointMake(xPoint, yPoint) withAttributes:attributes];
-        xPoint += -[UIScreen mainScreen].bounds.size.width;
-        yPoint += -[UIScreen mainScreen].bounds.size.height;
+        xPoint -= size.width;
+        yPoint -= size.height;
         [str drawAtPoint:CGPointMake(xPoint, yPoint) withAttributes:attributes];
     }
     

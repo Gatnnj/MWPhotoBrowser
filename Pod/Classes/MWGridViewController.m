@@ -36,13 +36,9 @@
             _columns = 6; _columnsL = 8;
             _margin = 1; _gutter = 2;
             _marginL = 1; _gutterL = 2;
-        } else if ([UIScreen mainScreen].bounds.size.height == 480) {
-            // iPhone 3.5 inch
-            _columns = 3; _columnsL = 4;
-            _margin = 0; _gutter = 1;
-            _marginL = 1; _gutterL = 2;
         } else {
-            // iPhone 4 inch
+            // iPhone 4 寸及以上。iOS 13 起所有支持机型的短边均 >= 568pt，
+            // 原 480pt（3.5 寸）分支已不可达，故统一按此配置。
             _columns = 3; _columnsL = 5;
             _margin = 0; _gutter = 1;
             _marginL = 0; _gutterL = 2;
