@@ -11,7 +11,7 @@ PODS:
     - FBSnapshotTestCase/Core
   - MBProgressHUD (1.2.0)
   - MWPhotoBrowser (2.1.2):
-    - MBProgressHUD (~> 1.2)
+    - MBProgressHUD (~> 1.2.0)
     - SDWebImage (>= 5.0.0)
   - SDWebImage (5.21.7):
     - SDWebImage/Core (= 5.21.7)
@@ -43,7 +43,7 @@ SPEC CHECKSUMS:
   "Expecta+Snapshots": dcff217eef506dabd6dfdc7864ea2da321fafbb8
   FBSnapshotTestCase: 094f9f314decbabe373b87cc339bea235a63e07a
   MBProgressHUD: 3ee5efcc380f6a79a7cc9b363dd669c5e1ae7406
-  MWPhotoBrowser: 41d72c0f1295c2eb51a43f1eddbf1774bd41a759
+  MWPhotoBrowser: ce1547366e6869efe465c98510929f04fa1ba499
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
   Specta: 3e1bd89c3517421982dc4d1c992503e48bd5fe66
 

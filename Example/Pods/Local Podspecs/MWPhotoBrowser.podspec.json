@@ -40,7 +40,7 @@
   ],
   "dependencies": {
     "MBProgressHUD": [
-      "~> 1.2"
+      "~> 1.2.0"
     ],
     "SDWebImage": [
       ">= 5.0.0"

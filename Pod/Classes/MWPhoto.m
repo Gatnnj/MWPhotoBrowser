@@ -29,9 +29,31 @@ static dispatch_queue_t MWPhotoBlurQueue(void) {
     return queue;
 }
 
+/// 模糊图与缩放缩略图共用同一个缓存目录，便于统一统计容量与淘汰。
+/// 文件名前缀区分类型：blur_ 为模糊图（含配套 .plist 元数据），zoom_ 为缩放缩略图。
+static NSString *MWPhotoImageCacheDirectory(void) {
+    static NSString *directory;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+        NSString *caches = paths.firstObject;
+        directory = [[caches stringByAppendingPathComponent:@"MWPhotoBrowserImageCache"] copy];
+
+        // 旧实现分别使用 MWPhotoBrowserBlurCache / MWPhotoBrowserZoomCache 两个目录，
+        // 这里一次性清理，避免遗留数据继续占用空间（两者都是可重建的缓存）
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        for (NSString *legacyName in @[@"MWPhotoBrowserBlurCache", @"MWPhotoBrowserZoomCache"]) {
+            NSString *legacyPath = [caches stringByAppendingPathComponent:legacyName];
+            if ([fileManager fileExistsAtPath:legacyPath]) {
+                [fileManager removeItemAtPath:legacyPath error:nil];
+            }
+        }
+    });
+    return directory;
+}
+
 static NSString *MWPhotoBlurCacheDirectory(void) {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
-    return [[paths.firstObject stringByAppendingPathComponent:@"MWPhotoBrowserBlurCache"] copy];
+    return MWPhotoImageCacheDirectory();
 }
 
 /// Cache by the URL path only; query parameters may contain rotating credentials.
@@ -54,17 +76,17 @@ static NSString *MWPhotoBlurCachePath(NSURL *url, CGFloat radius) {
     NSString *prefix = MWPhotoBlurCachePrefix(url);
     if (!prefix) return nil;
     NSString *radiusKey = [NSString stringWithFormat:@"%.3f", radius];
-    return [[MWPhotoBlurCacheDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_%@.jpg", prefix, radiusKey]] copy];
+    // blur_ 前缀用于与缩放缩略图区分（两者共用同一目录）
+    return [[MWPhotoBlurCacheDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"blur_%@_%@.jpg", prefix, radiusKey]] copy];
 }
 
 static NSString *MWPhotoZoomCacheDirectory(void) {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
-    return [[paths.firstObject stringByAppendingPathComponent:@"MWPhotoBrowserZoomCache"] copy];
+    return MWPhotoImageCacheDirectory();
 }
 
 static NSString *MWPhotoZoomCachePath(NSURL *url) {
     NSString *prefix = MWPhotoBlurCachePrefix(url);
-    return prefix ? [[MWPhotoZoomCacheDirectory() stringByAppendingPathComponent:[prefix stringByAppendingString:@".jpg"]] copy] : nil;
+    return prefix ? [[MWPhotoZoomCacheDirectory() stringByAppendingPathComponent:[@"zoom_" stringByAppendingString:[prefix stringByAppendingString:@".jpg"]]] copy] : nil;
 }
 
 static UIImage *MWPhotoDecodeZoomData(NSData *data) {
@@ -91,6 +113,80 @@ static UIImage *MWPhotoReadBlurCache(NSString *path) {
     return [UIImage imageWithCGImage:decoded.CGImage scale:scale orientation:orientation];
 }
 
+#pragma mark - Cache Size Control
+
+/// 缓存目录总容量上限
+static const unsigned long long MWPhotoImageCacheLimitBytes = 400ULL * 1024ULL * 1024ULL;
+/// 淘汰目标：删除到上限的 70%，避免每次写入都触发一轮删除
+static const double MWPhotoImageCacheTrimRatio = 0.7;
+/// 两次容量检查之间的最小间隔（秒）
+static const CFTimeInterval MWPhotoImageCacheCheckInterval = 60.0;
+/// 单次最多删除的文件数，避免长时间占用串行队列
+static const NSUInteger MWPhotoImageCacheMaxDeletionsPerPass = 200;
+
+static BOOL MWPhotoCacheFileIsBlurJPEG(NSString *fileName) {
+    return [fileName hasPrefix:@"blur_"] && [fileName hasSuffix:@".jpg"];
+}
+
+/// 目录总大小超过上限时，按修改时间从旧到新删除，直到降到目标容量。
+/// 内部派发到模糊缓存所用的串行队列，与写入、清理操作保持顺序一致。
+static void MWPhotoEnforceImageCacheLimitIfNeeded(void) {
+    dispatch_async(MWPhotoBlurQueue(), ^{
+        // 节流：避免每写一张图都全量扫描一次目录
+        static CFTimeInterval lastCheck = 0;
+        CFTimeInterval now = CFAbsoluteTimeGetCurrent();
+        if (lastCheck > 0 && (now - lastCheck) < MWPhotoImageCacheCheckInterval) {
+            return;
+        }
+        lastCheck = now;
+
+        NSString *directory = MWPhotoImageCacheDirectory();
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSArray<NSString *> *fileNames = [fileManager contentsOfDirectoryAtPath:directory error:nil];
+        if (!fileNames.count) return;
+
+        unsigned long long totalBytes = 0;
+        NSMutableArray<NSDictionary *> *entries = [NSMutableArray arrayWithCapacity:fileNames.count];
+        for (NSString *fileName in fileNames) {
+            NSString *path = [directory stringByAppendingPathComponent:fileName];
+            NSDictionary *attributes = [fileManager attributesOfItemAtPath:path error:nil];
+            if (!attributes) continue;
+            unsigned long long size = [attributes[NSFileSize] unsignedLongLongValue];
+            totalBytes += size;
+            [entries addObject:@{
+                @"path": path,
+                @"size": @(size),
+                @"date": attributes[NSFileModificationDate] ?: [NSDate distantPast],
+                @"name": fileName
+            }];
+        }
+        if (totalBytes <= MWPhotoImageCacheLimitBytes) return;
+
+        // 修改时间升序：最旧的排在前面，优先删除
+        [entries sortUsingComparator:^NSComparisonResult(NSDictionary *lhs, NSDictionary *rhs) {
+            return [lhs[@"date"] compare:rhs[@"date"]];
+        }];
+
+        unsigned long long targetBytes = (unsigned long long)(MWPhotoImageCacheLimitBytes * MWPhotoImageCacheTrimRatio);
+        unsigned long long removedBytes = 0;
+        NSUInteger removedCount = 0;
+        for (NSDictionary *entry in entries) {
+            if (totalBytes - removedBytes <= targetBytes) break;
+            if (removedCount >= MWPhotoImageCacheMaxDeletionsPerPass) break;
+
+            NSString *path = entry[@"path"];
+            // 删除模糊图 JPEG 时同步清理配套的 .plist，避免产生孤儿文件
+            if (MWPhotoCacheFileIsBlurJPEG(entry[@"name"])) {
+                [fileManager removeItemAtPath:[path stringByAppendingPathExtension:@"plist"] error:nil];
+            }
+            if ([fileManager removeItemAtPath:path error:nil]) {
+                removedBytes += [entry[@"size"] unsignedLongLongValue];
+                removedCount++;
+            }
+        }
+    });
+}
+
 static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     if (!image || !path) return;
     NSString *directory = [path stringByDeletingLastPathComponent];
@@ -99,6 +195,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     if (!data || ![data writeToFile:path options:NSDataWritingAtomic error:nil]) return;
     NSDictionary *metadata = @{@"scale": @(image.scale), @"orientation": @(image.imageOrientation)};
     [metadata writeToFile:[path stringByAppendingPathExtension:@"plist"] atomically:YES];
+    MWPhotoEnforceImageCacheLimitIfNeeded();
 }
 
 @interface MWPhoto () {
@@ -141,7 +238,15 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 
 + (void)clearBlurCacheWithCompletion:(void (^)(void))completion {
     dispatch_async(MWPhotoBlurQueue(), ^{
-        [[NSFileManager defaultManager] removeItemAtPath:MWPhotoBlurCacheDirectory() error:nil];
+        // 与缩放缩略图共用同一目录，这里只清理模糊图相关文件（blur_ 前缀，
+        // 含配套的 .plist），不能整目录删除
+        NSString *directory = MWPhotoImageCacheDirectory();
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        for (NSString *fileName in [fileManager contentsOfDirectoryAtPath:directory error:nil]) {
+            if ([fileName hasPrefix:@"blur_"]) {
+                [fileManager removeItemAtPath:[directory stringByAppendingPathComponent:fileName] error:nil];
+            }
+        }
         if (completion) dispatch_async(dispatch_get_main_queue(), completion);
     });
 }
@@ -155,7 +260,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     dispatch_async(MWPhotoBlurQueue(), ^{
         NSString *directory = MWPhotoBlurCacheDirectory();
         NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:directory error:nil];
-        NSString *filePrefix = [prefix stringByAppendingString:@"_"];
+        NSString *filePrefix = [NSString stringWithFormat:@"blur_%@_", prefix];
         for (NSString *file in files) {
             if ([file hasPrefix:filePrefix]) {
                 [[NSFileManager defaultManager] removeItemAtPath:[directory stringByAppendingPathComponent:file] error:nil];
@@ -171,7 +276,14 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 
 + (void)clearZoomCacheWithCompletion:(void (^)(void))completion {
     dispatch_async(MWPhotoBlurQueue(), ^{
-        [[NSFileManager defaultManager] removeItemAtPath:MWPhotoZoomCacheDirectory() error:nil];
+        // 与模糊图共用同一目录，这里只清理缩放缩略图（zoom_ 前缀）
+        NSString *directory = MWPhotoImageCacheDirectory();
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        for (NSString *fileName in [fileManager contentsOfDirectoryAtPath:directory error:nil]) {
+            if ([fileName hasPrefix:@"zoom_"]) {
+                [fileManager removeItemAtPath:[directory stringByAppendingPathComponent:fileName] error:nil];
+            }
+        }
         if (completion) dispatch_async(dispatch_get_main_queue(), completion);
     });
 }
@@ -198,9 +310,9 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 
 + (void)clearBlurAndZoomCacheWithCompletion:(void (^)(void))completion {
     dispatch_async(MWPhotoBlurQueue(), ^{
+        // 两类缓存现已共用一个目录，整目录删除即可
         NSFileManager *fileManager = [NSFileManager defaultManager];
-        [fileManager removeItemAtPath:MWPhotoBlurCacheDirectory() error:nil];
-        [fileManager removeItemAtPath:MWPhotoZoomCacheDirectory() error:nil];
+        [fileManager removeItemAtPath:MWPhotoImageCacheDirectory() error:nil];
         if (completion) dispatch_async(dispatch_get_main_queue(), completion);
     });
 }
@@ -615,6 +727,8 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
                         NSString *directory = [cachePath stringByDeletingLastPathComponent];
                         [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
                         [data writeToFile:cachePath options:NSDataWritingAtomic error:nil];
+                        // 写入后检查总容量，超限时淘汰最旧的文件
+                        MWPhotoEnforceImageCacheLimitIfNeeded();
                     }
                 }
             }
