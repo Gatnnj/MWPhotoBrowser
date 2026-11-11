@@ -13,7 +13,8 @@
 #import "MWCommon.h"
 #import "MWPhotoBrowser.h"
 #import "MWPhotoBrowserPrivate.h"
-#import "SDImageCache.h"
+#import "MWPhotoTransitionAnimator.h"
+#import "MWPhotoInteractiveTransition.h"
 #import "UIImage+MWPhotoBrowser.h"
 
 #define PADDING                  10
@@ -65,7 +66,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     _currentPageIndex = 0;
     _previousPageIndex = NSUIntegerMax;
     _currentVideoIndex = NSUIntegerMax;
-    _displayActionButton = YES;
     _displayNavArrows = NO;
     _zoomPhotosToFill = YES;
     _performingLayout = NO; // Reset on view did appear
@@ -93,11 +93,18 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 }
 
 - (void)dealloc {
+    // 撤销排队中的单击切换显隐（block 只弱持有 self，这里取消是为了不再回调到已销毁对象）
+    [self cancelPendingTapToggle];
+    // 控件显隐定时器必须在这里断开：它持有 self，不断开会拖住整个视图树延迟释放
+    [self cancelControlHiding];
     [self clearCurrentVideo];
     _pagingScrollView.delegate = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self releaseAllUnderlyingPhotos:NO];
-    [[SDImageCache sharedImageCache] clearMemory]; // clear memory
+    // 不再调用 [[SDImageCache sharedImageCache] clearMemory]：
+    // sharedImageCache 是全局单例，在这里清会连带清掉宿主 App 其他页面的图片内存缓存，
+    // 关闭一个相册浏览器不该影响整个进程。内存压力交给 SDWebImage 自身的
+    // didReceiveMemoryWarning 监听处理。
 }
 
 - (void)releaseAllUnderlyingPhotos:(BOOL)preserveCurrent {
@@ -146,6 +153,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	
 	// View
 	self.view.backgroundColor = [UIColor blackColor];
+	self.view.opaque = NO;
     self.view.clipsToBounds = YES;
 	
 	// Setup paging scrolling view
@@ -160,6 +168,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	_pagingScrollView.showsHorizontalScrollIndicator = NO;
 	_pagingScrollView.showsVerticalScrollIndicator = NO;
 	_pagingScrollView.backgroundColor = [UIColor blackColor];
+	_pagingScrollView.opaque = NO;
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
 	[self.view addSubview:_pagingScrollView];
 	
@@ -176,26 +185,72 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
     // Toolbar Items
     if (self.displayNavArrows) {
-        NSString *arrowPathFormat = @"MWPhotoBrowser.bundle/UIBarButtonItemArrow%@";
-        UIImage *previousButtonImage = [UIImage imageForResourcePath:[NSString stringWithFormat:arrowPathFormat, @"Left"] ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]];
-        UIImage *nextButtonImage = [UIImage imageForResourcePath:[NSString stringWithFormat:arrowPathFormat, @"Right"] ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]];
+        UIImage *previousButtonImage = [UIImage mw_imageNamed:@"UIBarButtonItemArrowLeft"];
+        UIImage *nextButtonImage = [UIImage mw_imageNamed:@"UIBarButtonItemArrowRight"];
         _previousButton = [[UIBarButtonItem alloc] initWithImage:previousButtonImage style:UIBarButtonItemStylePlain target:self action:@selector(gotoPreviousPage)];
         _nextButton = [[UIBarButtonItem alloc] initWithImage:nextButtonImage style:UIBarButtonItemStylePlain target:self action:@selector(gotoNextPage)];
     }
-    if (self.displayActionButton) {
-        _actionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
+    // Action（分享）按钮已移除：分享入口交由宿主自行实现
+
+    // 自定义丝滑转场：交互控制器把手势装在根视图，只对内部图片视图做 transform
+    // （对照 JXPhotoBrowser），因此与 reloadData 先后顺序无关
+    if (_enableCustomTransition) {
+        __weak typeof(self) weakSelf = self;
+        self.interactiveTransition =
+        [[MWPhotoInteractiveTransition alloc] initWithCurrentImageViewBlock:^UIView *{
+            MWPhotoBrowser *strongSelf = weakSelf;
+            if (!strongSelf) return nil;
+            // 先按当前索引找 page；找不到（索引不匹配）时退化为取任意可见页
+            MWZoomingScrollView *page = [strongSelf pageDisplayedAtIndex:strongSelf.currentIndex];
+            if (!page && strongSelf->_visiblePages.count > 0) {
+                page = strongSelf->_visiblePages.allObjects.firstObject;
+            }
+            // 正确的"未放大"判断：当前处于最小缩放（初始 zoomScale 可能不等于 1）
+            if (page.zoomScale > page.minimumZoomScale + 0.01) return nil;
+            return [page photoImageViewForTransition];
+        } setPagingEnabled:^(BOOL enabled) {
+            MWPhotoBrowser *strongSelf = weakSelf;
+            // nil 时直接返回：nil 的 ivar 直接解引用会崩溃（给 nil 发消息才安全）
+            if (!strongSelf) return;
+            strongSelf->_pagingScrollView.scrollEnabled = enabled;
+        } setBackgroundAlpha:^(CGFloat alpha) {
+            MWPhotoBrowser *strongSelf = weakSelf;
+            if (!strongSelf) return;
+            // 统一控制各层黑色背景，图片本身不透明
+            UIColor *background = [UIColor colorWithWhite:0 alpha:alpha];
+            strongSelf.view.backgroundColor = background;
+            strongSelf.view.opaque = NO;
+            strongSelf.navigationController.view.backgroundColor = [UIColor clearColor];
+            strongSelf.navigationController.view.opaque = NO;
+            // 导航栏整体（含标题和按钮）与浏览器背景共用同一 alpha。
+            strongSelf.navigationController.navigationBar.alpha = alpha;
+            strongSelf->_pagingScrollView.backgroundColor = background;
+            strongSelf->_pagingScrollView.opaque = NO;
+            for (MWZoomingScrollView *page in strongSelf->_visiblePages) {
+                [page setBackgroundAlpha:alpha];
+            }
+        } dismissTargetBlock:^UIView *{
+            return [weakSelf mw_startingView];
+        } dismissBlock:^{
+            // 拖拽快照已经完成了完整的缩略图回收动画，系统 dismiss 动画关闭，
+            // 避免松手后又额外播放一次重复的 zoom-out。
+            [weakSelf dismissViewControllerAnimated:NO completion:nil];
+        }];
+        // 手势安装在浏览器根视图
+        [self.interactiveTransition installGestureOnRootView:self.view];
     }
-    
+
     // Update
     [self reloadData];
-    
-    // Swipe to dismiss
-    if (_enableSwipeToDismiss) {
+
+    // 自定义转场启用时由交互式下拉手势负责关闭；旧的 swipe 手势会
+    // 在手指释放前直接触发 dismiss，破坏图片跟手的交互体验。
+    if (_enableSwipeToDismiss && !_enableCustomTransition) {
         UISwipeGestureRecognizer *swipeGesture = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(doneButtonPressed:)];
         swipeGesture.direction = UISwipeGestureRecognizerDirectionDown | UISwipeGestureRecognizerDirectionUp;
         [self.view addGestureRecognizer:swipeGesture];
     }
-    
+
 	// Super
     [super viewDidLoad];
 	
@@ -214,7 +269,9 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     // Navigation buttons
     if ([self.navigationController.viewControllers objectAtIndex:0] == self) {
         // We're first on stack so show done button
-        _doneButton = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Done", nil) style:UIBarButtonItemStylePlain target:self action:@selector(doneButtonPressed:)];
+        NSString *doneTitle = NSLocalizedString(@"Done", nil);
+        if (doneTitle.length == 0) doneTitle = @"Done";
+        _doneButton = [[UIBarButtonItem alloc] initWithTitle:doneTitle style:UIBarButtonItemStylePlain target:self action:@selector(doneButtonPressed:)];
         // Set appearance
         [_doneButton setBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
         [_doneButton setBackgroundImage:nil forState:UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
@@ -224,7 +281,10 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     } else {
         // We're not first so show back button
         UIViewController *previousViewController = [self.navigationController.viewControllers objectAtIndex:self.navigationController.viewControllers.count-2];
-        NSString *backButtonTitle = previousViewController.navigationItem.backBarButtonItem ? previousViewController.navigationItem.backBarButtonItem.title : previousViewController.title;
+        NSString *backButtonTitle = previousViewController.navigationItem.backBarButtonItem.title;
+        if (backButtonTitle.length == 0) backButtonTitle = previousViewController.title;
+        if (backButtonTitle.length == 0) backButtonTitle = NSLocalizedString(@"Back", nil);
+        if (backButtonTitle.length == 0) backButtonTitle = @"Back";
         UIBarButtonItem *newBackButton = [[UIBarButtonItem alloc] initWithTitle:backButtonTitle style:UIBarButtonItemStylePlain target:nil action:nil];
         // Appearance
         [newBackButton setBackButtonBackgroundImage:nil forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
@@ -236,23 +296,20 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     }
 
     // Toolbar items
-    BOOL hasItems = NO;
     UIBarButtonItem *fixedSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:self action:nil];
-    fixedSpace.width = 32; // To balance action button
+    fixedSpace.width = 32; // 右侧留白，维持原有布局平衡
     UIBarButtonItem *flexSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:self action:nil];
     NSMutableArray *items = [[NSMutableArray alloc] init];
 
     // Left button - Grid
     if (_enableGrid) {
-        hasItems = YES;
-        [items addObject:[[UIBarButtonItem alloc] initWithImage:[UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/UIBarButtonItemGrid" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]] style:UIBarButtonItemStylePlain target:self action:@selector(showGridAnimated)]];
+        [items addObject:[[UIBarButtonItem alloc] initWithImage:[UIImage mw_imageNamed:@"UIBarButtonItemGrid"] style:UIBarButtonItemStylePlain target:self action:@selector(showGridAnimated)]];
     } else {
         [items addObject:fixedSpace];
     }
 
     // Middle - Nav
     if (_previousButton && _nextButton && numberOfPhotos > 1) {
-        hasItems = YES;
         [items addObject:flexSpace];
         [items addObject:_previousButton];
         [items addObject:flexSpace];
@@ -262,15 +319,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         [items addObject:flexSpace];
     }
 
-    // Right - Action
-    if (_actionButton && !(!hasItems && !self.navigationItem.rightBarButtonItem)) {
-        [items addObject:_actionButton];
-    } else {
-        // We're not showing the toolbar so try and show in top right
-        if (_actionButton)
-            self.navigationItem.rightBarButtonItem = _actionButton;
-        [items addObject:fixedSpace];
-    }
+    // Right - 分享按钮已移除，仅保留右侧留白维持布局平衡
+    [items addObject:fixedSpace];
 
     // Toolbar visibility
     [_toolbar setItems:items];
@@ -409,7 +459,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
     // Controls
     [self.navigationController.navigationBar.layer removeAllAnimations]; // Stop all animations on nav bar
-    [NSObject cancelPreviousPerformRequestsWithTarget:self]; // Cancel any pending toggles from taps
+    [NSObject cancelPreviousPerformRequestsWithTarget:self]; // 取消历史 performSelector 排队的调用
+    [self cancelPendingTapToggle]; // 撤销排队中的单击切换显隐，避免退出过渡期间控件又隐藏
     [self setControlsHidden:NO animated:NO permanent:YES];
     
     // 旧的 setStatusBarStyle 还原逻辑已移除：现代机制下系统会根据
@@ -441,7 +492,15 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     navBar.translucent = YES;
     // UIBarStyleBlackTranslucent（iOS 13 废弃）替换为 UIBarStyleBlack，translucent 已在上方设为 YES
     navBar.barStyle = UIBarStyleBlack;
-    [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
+    if (_enableCustomTransition) {
+        // 禁用系统导航栏的模糊材质背景，避免它与浏览器黑色背景叠加后
+        // 产生不同的透底速度；导航栏内容和浏览器背景使用同一 alpha。
+        [navBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
+        navBar.shadowImage = [UIImage new];
+        navBar.backgroundColor = [UIColor clearColor];
+    } else {
+        [navBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
+    }
     // LandscapePhone metrics（iOS 8 废弃）已移除，横屏统一使用 Default metrics
 }
 
@@ -810,8 +869,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
             // Add play button if needed
             if (page.displayingVideo) {
                 UIButton *playButton = [UIButton buttonWithType:UIButtonTypeCustom];
-                [playButton setImage:[UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/PlayButtonOverlayLarge" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]] forState:UIControlStateNormal];
-                [playButton setImage:[UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/PlayButtonOverlayLargeTap" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]] forState:UIControlStateHighlighted];
+                [playButton setImage:[UIImage mw_imageNamed:@"PlayButtonOverlayLarge"] forState:UIControlStateNormal];
+                [playButton setImage:[UIImage mw_imageNamed:@"PlayButtonOverlayLargeTap"] forState:UIControlStateHighlighted];
                 [playButton addTarget:self action:@selector(playButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
                 [playButton sizeToFit];
                 playButton.frame = [self frameForPlayButton:playButton atIndex:index];
@@ -822,12 +881,12 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
             // Add selected button
             if (self.displaySelectionButtons) {
                 UIButton *selectedButton = [UIButton buttonWithType:UIButtonTypeCustom];
-                [selectedButton setImage:[UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/ImageSelectedOff" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]] forState:UIControlStateNormal];
+                [selectedButton setImage:[UIImage mw_imageNamed:@"ImageSelectedOff"] forState:UIControlStateNormal];
                 UIImage *selectedOnImage;
                 if (self.customImageSelectedIconName) {
                     selectedOnImage = [UIImage imageNamed:self.customImageSelectedIconName];
                 } else {
-                    selectedOnImage = [UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/ImageSelectedOn" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]];
+                    selectedOnImage = [UIImage mw_imageNamed:@"ImageSelectedOn"];
                 }
                 [selectedButton setImage:selectedOnImage forState:UIControlStateSelected];
                 [selectedButton sizeToFit];
@@ -1104,17 +1163,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	// Buttons
 	_previousButton.enabled = (_currentPageIndex > 0);
 	_nextButton.enabled = (_currentPageIndex < numberOfPhotos - 1);
-    
-    // Disable action button if there is no image or it's a video
-    MWPhoto *photo = [self photoAtIndex:_currentPageIndex];
-    if ([photo underlyingImage] == nil || ([photo respondsToSelector:@selector(isVideo)] && photo.isVideo)) {
-        _actionButton.enabled = NO;
-        _actionButton.tintColor = [UIColor clearColor]; // Tint to hide button
-    } else {
-        _actionButton.enabled = YES;
-        _actionButton.tintColor = nil;
-    }
-	
 }
 
 - (void)jumpToPageAtIndex:(NSUInteger)index animated:(BOOL)animated {
@@ -1377,14 +1425,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     [_gridController.view layoutIfNeeded];
     [_gridController adjustOffsetsAsRequired];
     
-    // Hide action button on nav bar if it exists
-    if (self.navigationItem.rightBarButtonItem == _actionButton) {
-        _gridPreviousRightNavItem = _actionButton;
-        [self.navigationItem setRightBarButtonItem:nil animated:YES];
-    } else {
-        _gridPreviousRightNavItem = nil;
-    }
-    
     // Update
     [self updateNavigation];
     [self setControlsHidden:NO animated:YES permanent:YES];
@@ -1409,11 +1449,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
     // Remember previous content offset
     _currentGridContentOffset = _gridController.collectionView.contentOffset;
-    
-    // Restore action button if it was removed
-    if (_gridPreviousRightNavItem == _actionButton && _actionButton) {
-        [self.navigationItem setRightBarButtonItem:_gridPreviousRightNavItem animated:YES];
-    }
     
     // Position prior to hide animation
     CGRect newPagingFrame = [self frameForPagingScrollView];
@@ -1562,7 +1597,14 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 - (void)hideControlsAfterDelay {
 	if (![self areControlsHidden]) {
         [self cancelControlHiding];
-		_controlVisibilityTimer = [NSTimer scheduledTimerWithTimeInterval:self.delayToHideElements target:self selector:@selector(hideControls) userInfo:nil repeats:NO];
+        // 换成 block 版定时器 + weak self：timer 不再强持有 self，
+        // 控制器被 dismiss 时能立即释放，不必等这一次触发完
+        __weak typeof(self) weakSelf = self;
+		_controlVisibilityTimer = [NSTimer scheduledTimerWithTimeInterval:self.delayToHideElements
+                                                                 repeats:NO
+                                                                   block:^(NSTimer * _Nonnull timer) {
+            [weakSelf hideControls];
+        }];
 	}
 }
 
@@ -1570,6 +1612,33 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 - (void)hideControls { [self setControlsHidden:YES animated:YES permanent:NO]; }
 - (void)showControls { [self setControlsHidden:NO animated:YES permanent:NO]; }
 - (void)toggleControls { [self setControlsHidden:![self areControlsHidden] animated:YES permanent:NO]; }
+
+#pragma mark - Single Tap Scheduling
+
+- (void)scheduleToggleControlsFromTap {
+    // 单击延迟 0.2 秒切换控件显隐，给双击留出判定窗口。
+    // 使用可取消的 dispatch block：双击、开始拖拽或退出页面时能真正撤销这次排队，
+    // 避免缩放 / 返回后控件又闪一下。
+    [self cancelPendingTapToggle];
+
+    __weak typeof(self) weakSelf = self;
+    dispatch_block_t block = dispatch_block_create(DISPATCH_BLOCK_INHERIT_QOS_CLASS, ^{
+        typeof(self) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        strongSelf->_pendingTapToggleBlock = nil;
+        [strongSelf toggleControls];
+    });
+    _pendingTapToggleBlock = block;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), block);
+}
+
+- (void)cancelPendingTapToggle {
+    if (_pendingTapToggleBlock) {
+        dispatch_block_cancel(_pendingTapToggleBlock);
+        _pendingTapToggleBlock = nil;
+    }
+}
 
 #pragma mark - Properties
 
@@ -1615,101 +1684,48 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     }
 }
 
-#pragma mark - Actions
+#pragma mark - UIViewControllerTransitioningDelegate
 
-- (void)actionButtonPressed:(id)sender {
-
-    // Only react when image has loaded
-    id <MWPhoto> photo = [self photoAtIndex:_currentPageIndex];
-    if ([self numberOfPhotos] > 0 && [photo underlyingImage]) {
-        
-        // If they have defined a delegate method then just message them
-        if ([self.delegate respondsToSelector:@selector(photoBrowser:actionButtonPressedForPhotoAtIndex:)]) {
-            
-            // Let delegate handle things
-            [self.delegate photoBrowser:self actionButtonPressedForPhotoAtIndex:_currentPageIndex];
-            
-        } else {
-            
-            // Show activity view controller
-            NSMutableArray *items = [NSMutableArray arrayWithObject:[photo underlyingImage]];
-            if (photo.caption) {
-                [items addObject:photo.caption];
-            }
-            self.activityViewController = [[UIActivityViewController alloc] initWithActivityItems:items applicationActivities:nil];
-            
-            // Show loading spinner after a couple of seconds
-            double delayInSeconds = 2.0;
-            dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-            dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-                if (self.activityViewController) {
-                    [self showProgressHUDWithMessage:nil];
-                }
-            });
-
-            // Show
-            typeof(self) __weak weakSelf = self;
-            [self.activityViewController setCompletionWithItemsHandler:^(UIActivityType  _Nullable activityType, BOOL completed, NSArray * _Nullable returnedItems, NSError * _Nullable activityError) {
-                weakSelf.activityViewController = nil;
-                [weakSelf hideControlsAfterDelay];
-                [weakSelf hideProgressHUD:YES];
-            }];
-//            [self.activityViewController setCompletionHandler:^(NSString *activityType, BOOL completed) {
-//                weakSelf.activityViewController = nil;
-//                [weakSelf hideControlsAfterDelay];
-//                [weakSelf hideProgressHUD:YES];
-//            }];
-            
-            // iOS 8 - Set the Anchor Point for the popover
-            self.activityViewController.popoverPresentationController.barButtonItem = _actionButton;
-//            if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"8")) {
-//                self.activityViewController.popoverPresentationController.barButtonItem = _actionButton;
-//            }
-            [self presentViewController:self.activityViewController animated:YES completion:nil];
-
-        }
-        
-        // Keep controls hidden
-        [self setControlsHidden:NO animated:YES permanent:YES];
-
+/// 获取当前图片对应的起始缩略图视图（调用方未实现则为 nil）
+- (UIView *)mw_startingView {
+    if ([_delegate respondsToSelector:@selector(photoBrowser:startingViewForPhotoAtIndex:)]) {
+        return [_delegate photoBrowser:self startingViewForPhotoAtIndex:_currentPageIndex];
     }
-    
+    return nil;
 }
 
-#pragma mark - Action Progress
-
-- (MBProgressHUD *)progressHUD {
-    if (!_progressHUD) {
-        _progressHUD = [[MBProgressHUD alloc] initWithView:self.view];
-        _progressHUD.minSize = CGSizeMake(120, 120);
-        _progressHUD.minShowTime = 1;
-        [self.view addSubview:_progressHUD];
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented
+                                                                   presentingController:(UIViewController *)presenting
+                                                                       sourceController:(UIViewController *)source {
+    MWPhotoTransitionAnimator *animator = [[MWPhotoTransitionAnimator alloc] init];
+    animator.dismissing = NO;
+    UIView *startView = [self mw_startingView];
+    animator.startView = startView;
+    // 取缩略图上的图片作为连贯移动素材，取不到则动画器内部自动降级渐隐
+    if ([startView isKindOfClass:[UIImageView class]]) {
+        animator.transitionImage = ((UIImageView *)startView).image;
     }
-    return _progressHUD;
+    return animator;
 }
 
-- (void)showProgressHUDWithMessage:(NSString *)message {
-    self.progressHUD.labelText = message;
-    self.progressHUD.mode = MBProgressHUDModeIndeterminate;
-    [self.progressHUD show:YES];
-    self.navigationController.navigationBar.userInteractionEnabled = NO;
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed {
+    MWPhotoTransitionAnimator *animator = [[MWPhotoTransitionAnimator alloc] init];
+    animator.dismissing = YES;
+    // 关闭时飞回的目标缩略图
+    animator.endView = [self mw_startingView];
+    // 提供当前页图片视图，动画器从其当前实际位置（含拖拽 transform）飞回
+    MWZoomingScrollView *page = [self pageDisplayedAtIndex:_currentPageIndex];
+    animator.dismissingImageView = [page photoImageViewForTransition];
+    return animator;
 }
 
-- (void)hideProgressHUD:(BOOL)animated {
-    [self.progressHUD hide:animated];
-    self.navigationController.navigationBar.userInteractionEnabled = YES;
+- (id<UIViewControllerInteractiveTransitioning>)interactionControllerForDismissal:(id<UIViewControllerAnimatedTransitioning>)animator {
+    // 拖拽在手势结束后以非交互方式触发，始终返回 nil
+    return nil;
 }
 
-- (void)showProgressHUDCompleteMessage:(NSString *)message {
-    if (message) {
-        if (self.progressHUD.isHidden) [self.progressHUD show:YES];
-        self.progressHUD.labelText = message;
-        self.progressHUD.mode = MBProgressHUDModeCustomView;
-        [self.progressHUD hide:YES afterDelay:1.5];
-    } else {
-        [self.progressHUD hide:YES];
-    }
-    self.navigationController.navigationBar.userInteractionEnabled = YES;
+- (id<UIViewControllerInteractiveTransitioning>)interactionControllerForPresentation:(id<UIViewControllerAnimatedTransitioning>)animator {
+    return nil;
 }
 
 @end

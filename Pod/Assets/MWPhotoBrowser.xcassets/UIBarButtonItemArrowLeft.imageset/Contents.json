@@ -1,0 +1,23 @@
+{
+  "images": [
+    {
+      "filename": "UIBarButtonItemArrowLeft.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "UIBarButtonItemArrowLeft@2x.png",
+      "idiom": "universal",
+      "scale": "2x"
+    },
+    {
+      "filename": "UIBarButtonItemArrowLeft@3x.png",
+      "idiom": "universal",
+      "scale": "3x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

@@ -6,7 +6,7 @@
 //  Copyright 2010 d3i. All rights reserved.
 //
 
-#import <DACircularProgress/DACircularProgressView.h>
+#import "MWCircularProgressView.h"
 #import "MWCommon.h"
 #import "MWZoomingScrollView.h"
 #import "MWPhotoBrowser.h"
@@ -20,7 +20,7 @@
     MWPhotoBrowser __weak *_photoBrowser;
 	MWTapDetectingView *_tapView; // for background taps
 	MWTapDetectingImageView *_photoImageView;
-	DACircularProgressView *_loadingIndicator;
+	UIView *_loadingIndicator;
     UIImageView *_loadingError;
     
 }
@@ -41,6 +41,7 @@
 		_tapView.tapDelegate = self;
 		_tapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 		_tapView.backgroundColor = [UIColor blackColor];
+		_tapView.opaque = NO;
 		[self addSubview:_tapView];
 		
 		// Image view
@@ -48,13 +49,19 @@
 		_photoImageView.tapDelegate = self;
 		_photoImageView.contentMode = UIViewContentModeCenter;
 		_photoImageView.backgroundColor = [UIColor blackColor];
+		_photoImageView.opaque = NO;
 		[self addSubview:_photoImageView];
 		
 		// Loading indicator
-		_loadingIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(140.0f, 30.0f, 40.0f, 40.0f)];
+		_loadingIndicator = browser.loadingViewProvider ? browser.loadingViewProvider(self) : nil;
+        if (!_loadingIndicator) {
+            MWCircularProgressView *defaultIndicator = [[MWCircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
+            defaultIndicator.thicknessRatio = 0.1;
+            _loadingIndicator = defaultIndicator;
+        } else if (_loadingIndicator.bounds.size.width <= 0 || _loadingIndicator.bounds.size.height <= 0) {
+            _loadingIndicator.frame = CGRectMake(0, 0, 40.0f, 40.0f);
+        }
         _loadingIndicator.userInteractionEnabled = NO;
-        _loadingIndicator.thicknessRatio = 0.1;
-        _loadingIndicator.roundedCorners = NO;
 		_loadingIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin |
         UIViewAutoresizingFlexibleBottomMargin | UIViewAutoresizingFlexibleRightMargin;
 		[self addSubview:_loadingIndicator];
@@ -172,7 +179,7 @@
     if (![_photo respondsToSelector:@selector(emptyImage)] || !_photo.emptyImage) {
         if (!_loadingError) {
             _loadingError = [UIImageView new];
-            _loadingError.image = [UIImage imageForResourcePath:@"MWPhotoBrowser.bundle/ImageError" ofType:@"png" inBundle:[NSBundle bundleForClass:[self class]]];
+            _loadingError.image = [UIImage mw_imageNamed:@"ImageError"];
             _loadingError.userInteractionEnabled = NO;
             _loadingError.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin |
             UIViewAutoresizingFlexibleBottomMargin | UIViewAutoresizingFlexibleRightMargin;
@@ -202,7 +209,10 @@
         if (photoWithProgress == self.photo) {
             float progress = [[dict valueForKey:@"progress"] floatValue];
             // 显式 self 消除 block 隐式 retain 警告
-            self->_loadingIndicator.progress = MAX(MIN(1, progress), 0);
+            CGFloat normalizedProgress = MAX(MIN(1, progress), 0);
+            if ([self->_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
+                [(id<MWPhotoBrowserLoadingView>)self->_loadingIndicator setProgress:normalizedProgress];
+            }
         }
     });
 }
@@ -212,12 +222,35 @@
 }
 
 - (void)showLoadingIndicator {
-    self.zoomScale = 0;
-    self.minimumZoomScale = 0;
-    self.maximumZoomScale = 0;
-    _loadingIndicator.progress = 0;
+    // UIScrollView 的缩放比例必须为正数；0 会触发
+    // _clampedZoomScale:allowRubberbanding: 的系统警告。
+    self.minimumZoomScale = 1;
+    self.maximumZoomScale = 1;
+    self.zoomScale = 1;
+    if ([_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
+        [(id<MWPhotoBrowserLoadingView>)_loadingIndicator setProgress:0];
+    }
     _loadingIndicator.hidden = NO;
+    // 立即摆到中心，不能依赖 layoutSubviews：
+    // 上面设置 zoomScale 会同步触发一次布局，那时指示器还是 hidden 状态会被跳过；
+    // 之后再把 hidden 置为 NO 已经没有新的布局机会，指示器会停在 (0,0) 左上角，
+    // 视觉上等同于"没有显示"。这里主动居中，保证一显示就在正确位置。
+    [self centerLoadingIndicator];
     [self hideImageFailure];
+}
+
+- (void)centerLoadingIndicator {
+    if (!_loadingIndicator || _loadingIndicator.hidden) return;
+    CGSize boundsSize = self.bounds.size;
+    CGSize indicatorSize = _loadingIndicator.frame.size;
+    if (indicatorSize.width <= 0.0f || indicatorSize.height <= 0.0f) return;
+    // bounds 尚未生效时不去计算，避免算出负坐标把指示器推到可视区外，
+    // 交给下一次 layoutSubviews 处理即可
+    if (boundsSize.width <= 0.0f || boundsSize.height <= 0.0f) return;
+    _loadingIndicator.frame = CGRectMake(floorf((boundsSize.width - indicatorSize.width) / 2.0f),
+                                         floorf((boundsSize.height - indicatorSize.height) / 2.0f),
+                                         indicatorSize.width,
+                                         indicatorSize.height);
 }
 
 #pragma mark - Setup
@@ -228,6 +261,7 @@
         // Zoom image to fill if the aspect ratios are fairly similar
         CGSize boundsSize = self.bounds.size;
         CGSize imageSize = _photoImageView.image.size;
+        if (boundsSize.width <= 0 || boundsSize.height <= 0 || imageSize.width <= 0 || imageSize.height <= 0) return zoomScale;
         CGFloat boundsAR = boundsSize.width / boundsSize.height;
         CGFloat imageAR = imageSize.width / imageSize.height;
         CGFloat xScale = boundsSize.width / imageSize.width;    // the scale needed to perfectly fit the image width-wise
@@ -245,8 +279,8 @@
 - (void)setMaxMinZoomScalesForCurrentBounds {
     
     // Reset
-    self.maximumZoomScale = 1;
     self.minimumZoomScale = 1;
+    self.maximumZoomScale = 1;
     self.zoomScale = 1;
     
     // Bail if no image
@@ -258,6 +292,8 @@
     // Sizes
     CGSize boundsSize = self.bounds.size;
     CGSize imageSize = _photoImageView.image.size;
+    // 首次布局或旋转过程中 bounds 可能暂时为零，保留上面的 1 倍安全值。
+    if (boundsSize.width <= 0 || boundsSize.height <= 0 || imageSize.width <= 0 || imageSize.height <= 0) return;
     
     // Calculate Min
     CGFloat xScale = boundsSize.width / imageSize.width;    // the scale needed to perfectly fit the image width-wise
@@ -315,10 +351,7 @@
 	
 	// Position indicators (centre does not seem to work!)
 	if (!_loadingIndicator.hidden)
-        _loadingIndicator.frame = CGRectMake(floorf((self.bounds.size.width - _loadingIndicator.frame.size.width) / 2.),
-                                         floorf((self.bounds.size.height - _loadingIndicator.frame.size.height) / 2),
-                                         _loadingIndicator.frame.size.width,
-                                         _loadingIndicator.frame.size.height);
+        [self centerLoadingIndicator];
 	if (_loadingError)
         _loadingError.frame = CGRectMake(floorf((self.bounds.size.width - _loadingError.frame.size.width) / 2.),
                                          floorf((self.bounds.size.height - _loadingError.frame.size.height) / 2),
@@ -358,12 +391,31 @@
 	return _photoImageView;
 }
 
+- (MWPhotoBrowser *)photoBrowser {
+    return _photoBrowser;
+}
+
+- (UIView *)photoImageViewForTransition {
+    return _photoImageView;
+}
+
+- (void)setBackgroundAlpha:(CGFloat)alpha {
+    // 仅改变各层黑色背景，图片（photoImageView.image）不受影响
+    UIColor *background = [UIColor colorWithWhite:0 alpha:alpha];
+    self.backgroundColor = background;
+    self.opaque = NO;
+    _tapView.backgroundColor = background;
+    _photoImageView.backgroundColor = background;
+}
+
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    [_photoBrowser cancelPendingTapToggle]; // 开始横向拖动，排队中的单击不应再切换显隐
 	[_photoBrowser cancelControlHiding];
 }
 
 - (void)scrollViewWillBeginZooming:(UIScrollView *)scrollView withView:(UIView *)view {
     self.scrollEnabled = YES; // reset
+    [_photoBrowser cancelPendingTapToggle]; // 捏合缩放同理
 	[_photoBrowser cancelControlHiding];
 }
 
@@ -379,12 +431,9 @@
 #pragma mark - Tap Detection
 
 - (void)handleSingleTap:(CGPoint)touchPoint {
-    // 旧实现 performSelector:afterDelay: 替换为 GCD，保持 0.2 秒延迟后切换控件显隐
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        // 显式 self 消除 block 隐式 retain 警告
-        [self->_photoBrowser toggleControls];
-    });
+    // 单击 / 双击的时序统一交给 browser 调度：延迟 0.2 秒切换控件显隐，
+    // 双击时由 handleDoubleTap 取消这次排队，避免缩放后工具栏再闪一下
+    [_photoBrowser scheduleToggleControlsFromTap];
 }
 
 - (void)handleDoubleTap:(CGPoint)touchPoint {
@@ -394,8 +443,8 @@
         return;
     }
 	
-	// Cancel any single tap handling
-	[NSObject cancelPreviousPerformRequestsWithTarget:_photoBrowser];
+	// 取消排队中的单击切换显隐（双击缩放后不应再闪一次工具栏）
+	[_photoBrowser cancelPendingTapToggle];
 	
 	// Zoom
 	if (self.zoomScale != self.minimumZoomScale && self.zoomScale != [self initialZoomScaleWithMinScale]) {

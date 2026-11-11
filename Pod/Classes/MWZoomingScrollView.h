@@ -31,4 +31,13 @@
 - (BOOL)displayingVideo;
 - (void)setImageHidden:(BOOL)hidden;
 
+// 暴露所属浏览器，供交互控制器复位时重算布局
+- (MWPhotoBrowser *)photoBrowser;
+
+// 暴露内部图片视图，供自定义转场获取其当前位置（含拖拽后的 transform）
+- (UIView *)photoImageViewForTransition;
+
+// 统一设置页面内部黑色背景的透明度（不影响图片本身），用于拖拽时背景渐隐
+- (void)setBackgroundAlpha:(CGFloat)alpha;
+
 @end
