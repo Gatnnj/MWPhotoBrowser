@@ -42,7 +42,9 @@ Pod::Spec.new do |s|
   s.frameworks = 'ImageIO', 'QuartzCore', 'AVKit', 'AVFoundation', 'Photos'
 
   s.dependency 'MBProgressHUD', '~> 0.9'
-  s.dependency 'DACircularProgress', '~> 2.3'
+
+  # DACircularProgress 已移除：内置进度环改用 MWCircularProgressView
+  # （CAShapeLayer + strokeEnd 实现），不再依赖第三方库
 
   # SDWebImage
   # 3.7.2 contains bugs downloading local files

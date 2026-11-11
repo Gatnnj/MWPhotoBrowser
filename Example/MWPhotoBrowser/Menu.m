@@ -1204,12 +1204,32 @@
 #pragma mark - 丝滑转场演示
 
 - (void)showSmoothTransition {
+    
+    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{}];
+    
     // 1. 准备本地图片数据
     NSMutableArray *demoPhotos = [NSMutableArray array];
-    NSArray *names = @[@"photo1", @"photo2", @"photo2", @"photo3", @"photo4"];
+    NSArray<NSString *> *urls = @[
+        @"https://picsum.photos/id/1015/3840/2560",
+        @"https://picsum.photos/id/1016/3840/2560",
+        @"https://picsum.photos/id/1020/3840/2560",
+        @"https://picsum.photos/id/1024/3840/2560",
+        @"https://picsum.photos/id/1036/3840/2560",
+        @"https://picsum.photos/id/1040/3840/2560",
+        @"https://picsum.photos/id/1018/3840/2160",
+        @"https://picsum.photos/id/1021/3840/2160",
+        @"https://picsum.photos/id/1035/3840/2160",
+        @"https://picsum.photos/id/1041/3840/2160",
+        @"https://picsum.photos/id/1019/2560/3840",
+        @"https://picsum.photos/id/1022/2560/3840",
+        @"https://picsum.photos/id/1025/2560/3840",
+        @"https://picsum.photos/id/1039/2560/3840",
+        @"https://picsum.photos/id/1023/3000/3000",
+    ];
+
     NSInteger index = 0;
-    for (NSString *name in names) {
-        MWPhoto *p = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:name ofType:@"jpg"]] isBlur:[name isEqualToString:@"photo2"]];
+    for (NSString *url in urls) {
+        MWPhoto *p = [MWPhoto photoWithURL:[NSURL URLWithString:url] isBlur:[url isEqualToString:@"https://picsum.photos/id/1016/3840/2560"]];
         p.radius = index == 1 ? 30 : 20;
         [demoPhotos addObject:p];
         index++;

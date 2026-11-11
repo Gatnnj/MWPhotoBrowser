@@ -6,7 +6,7 @@
 //
 //
 
-#import <DACircularProgress/DACircularProgressView.h>
+#import "MWCircularProgressView.h"
 #import "MWGridCell.h"
 #import "MWCommon.h"
 #import "MWPhotoBrowserPrivate.h"
@@ -99,9 +99,8 @@
             _loadingIndicator.frame = CGRectMake(0, 0, 40.0f, 40.0f);
         }
     } else {
-        DACircularProgressView *defaultIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
+        MWCircularProgressView *defaultIndicator = [[MWCircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
         defaultIndicator.thicknessRatio = 0.1;
-        defaultIndicator.roundedCorners = NO;
         _loadingIndicator = defaultIndicator;
     }
     _loadingIndicator.userInteractionEnabled = NO;
@@ -165,6 +164,11 @@
     _imageView.image = gridImage ?: [_photo underlyingImage];
     _selectedButton.hidden = !_selectionMode;
     [self hideImageFailure];
+    // 拿到可展示的图才收起进度环；否则保持加载态（不能无条件隐藏，
+    // 否则缩略图未就绪时进度环会提前消失）
+    if (_imageView.image) {
+        [self hideLoadingIndicator];
+    }
 }
 
 #pragma mark - Selection
@@ -207,8 +211,10 @@
 }
 
 - (void)showLoadingIndicator {
-    if ([_loadingIndicator isKindOfClass:[DACircularProgressView class]]) {
-        ((DACircularProgressView *)_loadingIndicator).progress = 0;
+    // 统一走 MWPhotoBrowserLoadingView 协议：内置实现与外部自定义 loading view
+    // 只要实现了 -setProgress: 就能被重置，不再按具体类做类型判断
+    if ([_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
+        [(id<MWPhotoBrowserLoadingView>)_loadingIndicator setProgress:0];
     }
     _loadingIndicator.hidden = NO;
     [self hideImageFailure];

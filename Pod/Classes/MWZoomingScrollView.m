@@ -6,7 +6,7 @@
 //  Copyright 2010 d3i. All rights reserved.
 //
 
-#import <DACircularProgress/DACircularProgressView.h>
+#import "MWCircularProgressView.h"
 #import "MWCommon.h"
 #import "MWZoomingScrollView.h"
 #import "MWPhotoBrowser.h"
@@ -55,9 +55,8 @@
 		// Loading indicator
 		_loadingIndicator = browser.loadingViewProvider ? browser.loadingViewProvider(self) : nil;
         if (!_loadingIndicator) {
-            DACircularProgressView *defaultIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
+            MWCircularProgressView *defaultIndicator = [[MWCircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
             defaultIndicator.thicknessRatio = 0.1;
-            defaultIndicator.roundedCorners = NO;
             _loadingIndicator = defaultIndicator;
         } else if (_loadingIndicator.bounds.size.width <= 0 || _loadingIndicator.bounds.size.height <= 0) {
             _loadingIndicator.frame = CGRectMake(0, 0, 40.0f, 40.0f);
@@ -232,7 +231,26 @@
         [(id<MWPhotoBrowserLoadingView>)_loadingIndicator setProgress:0];
     }
     _loadingIndicator.hidden = NO;
+    // 立即摆到中心，不能依赖 layoutSubviews：
+    // 上面设置 zoomScale 会同步触发一次布局，那时指示器还是 hidden 状态会被跳过；
+    // 之后再把 hidden 置为 NO 已经没有新的布局机会，指示器会停在 (0,0) 左上角，
+    // 视觉上等同于"没有显示"。这里主动居中，保证一显示就在正确位置。
+    [self centerLoadingIndicator];
     [self hideImageFailure];
+}
+
+- (void)centerLoadingIndicator {
+    if (!_loadingIndicator || _loadingIndicator.hidden) return;
+    CGSize boundsSize = self.bounds.size;
+    CGSize indicatorSize = _loadingIndicator.frame.size;
+    if (indicatorSize.width <= 0.0f || indicatorSize.height <= 0.0f) return;
+    // bounds 尚未生效时不去计算，避免算出负坐标把指示器推到可视区外，
+    // 交给下一次 layoutSubviews 处理即可
+    if (boundsSize.width <= 0.0f || boundsSize.height <= 0.0f) return;
+    _loadingIndicator.frame = CGRectMake(floorf((boundsSize.width - indicatorSize.width) / 2.0f),
+                                         floorf((boundsSize.height - indicatorSize.height) / 2.0f),
+                                         indicatorSize.width,
+                                         indicatorSize.height);
 }
 
 #pragma mark - Setup
@@ -333,10 +351,7 @@
 	
 	// Position indicators (centre does not seem to work!)
 	if (!_loadingIndicator.hidden)
-        _loadingIndicator.frame = CGRectMake(floorf((self.bounds.size.width - _loadingIndicator.frame.size.width) / 2.),
-                                         floorf((self.bounds.size.height - _loadingIndicator.frame.size.height) / 2),
-                                         _loadingIndicator.frame.size.width,
-                                         _loadingIndicator.frame.size.height);
+        [self centerLoadingIndicator];
 	if (_loadingError)
         _loadingError.frame = CGRectMake(floorf((self.bounds.size.width - _loadingError.frame.size.width) / 2.),
                                          floorf((self.bounds.size.height - _loadingError.frame.size.height) / 2),
