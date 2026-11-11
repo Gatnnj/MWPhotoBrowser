@@ -1,34 +1,19 @@
 # MWPhotoBrowser
 
-<!--[![CI Status](http://img.shields.io/travis/Michael Waterfall/MWPhotoBrowser.svg?style=flat)](https://travis-ci.org/Michael Waterfall/MWPhotoBrowser)-->
+
 [![Version](https://img.shields.io/cocoapods/v/MWPhotoBrowser.svg?style=flat)](http://cocoapods.org/pods/MWPhotoBrowser)
 [![License](https://img.shields.io/cocoapods/l/MWPhotoBrowser.svg?style=flat)](http://cocoapods.org/pods/MWPhotoBrowser)
 [![Platform](https://img.shields.io/cocoapods/p/MWPhotoBrowser.svg?style=flat)](http://cocoapods.org/pods/MWPhotoBrowser)
 
-[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=mwaterfall&url=https://github.com/mwaterfall/MWPhotoBrowser&title=MWPhotoBrowser&language=&tags=github&category=software)
+### 提交**记录**
 
-## A simple iOS photo and video browser with optional grid view, captions and selections.
+### Version 3.0.0
 
-MWPhotoBrowser can display one or more images or videos by providing either `UIImage` objects, `PHAsset` objects, or URLs to library assets, web images/videos or local files. The photo browser handles the downloading and caching of photos from the web seamlessly. Photos can be zoomed and panned, and optional (customisable) captions can be displayed.
+> 2026年11月11日
 
-The browser can also be used to allow the user to select one or more photos using either the grid or main image view.
+- 提交v3.0.0版本
 
-[![Alt][screenshot1_thumb]][screenshot1]    [![Alt][screenshot2_thumb]][screenshot2]    [![Alt][screenshot3_thumb]][screenshot3]    [![Alt][screenshot4_thumb]][screenshot4]    [![Alt][screenshot5_thumb]][screenshot5]    [![Alt][screenshot6_thumb]][screenshot6]
-
-[screenshot1_thumb]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser1t.png
-[screenshot1]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser1.png
-[screenshot2_thumb]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser2t.png
-[screenshot2]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser2.png
-[screenshot3_thumb]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser3t.png
-[screenshot3]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser3.png
-[screenshot4_thumb]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser4t.png
-[screenshot4]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser4.png
-[screenshot5_thumb]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser5t.png
-[screenshot5]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser5.png
-[screenshot6_thumb]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser6t.png
-[screenshot6]: https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser6.png
-
-Works on iOS 7+. All strings are localisable so they can be used in apps that support multiple languages.
+  
 
 ## Usage
 
@@ -219,6 +204,8 @@ import MWPhotoBrowser
 ## Author
 
 Michael Waterfall, michael@d3i.com
+
+Gatnnj, gatnnj880@gmail.com
 
 
 ## License
