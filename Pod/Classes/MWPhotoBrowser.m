@@ -66,7 +66,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     _currentPageIndex = 0;
     _previousPageIndex = NSUIntegerMax;
     _currentVideoIndex = NSUIntegerMax;
-    _displayActionButton = YES;
     _displayNavArrows = NO;
     _zoomPhotosToFill = YES;
     _performingLayout = NO; // Reset on view did appear
@@ -191,10 +190,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         _previousButton = [[UIBarButtonItem alloc] initWithImage:previousButtonImage style:UIBarButtonItemStylePlain target:self action:@selector(gotoPreviousPage)];
         _nextButton = [[UIBarButtonItem alloc] initWithImage:nextButtonImage style:UIBarButtonItemStylePlain target:self action:@selector(gotoNextPage)];
     }
-    if (self.displayActionButton) {
-        _actionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
-    }
-    
+    // Action（分享）按钮已移除：分享入口交由宿主自行实现
+
     // 自定义丝滑转场：交互控制器把手势装在根视图，只对内部图片视图做 transform
     // （对照 JXPhotoBrowser），因此与 reloadData 先后顺序无关
     if (_enableCustomTransition) {
@@ -299,15 +296,13 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     }
 
     // Toolbar items
-    BOOL hasItems = NO;
     UIBarButtonItem *fixedSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:self action:nil];
-    fixedSpace.width = 32; // To balance action button
+    fixedSpace.width = 32; // 右侧留白，维持原有布局平衡
     UIBarButtonItem *flexSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:self action:nil];
     NSMutableArray *items = [[NSMutableArray alloc] init];
 
     // Left button - Grid
     if (_enableGrid) {
-        hasItems = YES;
         [items addObject:[[UIBarButtonItem alloc] initWithImage:[UIImage mw_imageNamed:@"UIBarButtonItemGrid"] style:UIBarButtonItemStylePlain target:self action:@selector(showGridAnimated)]];
     } else {
         [items addObject:fixedSpace];
@@ -315,7 +310,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
     // Middle - Nav
     if (_previousButton && _nextButton && numberOfPhotos > 1) {
-        hasItems = YES;
         [items addObject:flexSpace];
         [items addObject:_previousButton];
         [items addObject:flexSpace];
@@ -325,15 +319,8 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         [items addObject:flexSpace];
     }
 
-    // Right - Action
-    if (_actionButton && !(!hasItems && !self.navigationItem.rightBarButtonItem)) {
-        [items addObject:_actionButton];
-    } else {
-        // We're not showing the toolbar so try and show in top right
-        if (_actionButton)
-            self.navigationItem.rightBarButtonItem = _actionButton;
-        [items addObject:fixedSpace];
-    }
+    // Right - 分享按钮已移除，仅保留右侧留白维持布局平衡
+    [items addObject:fixedSpace];
 
     // Toolbar visibility
     [_toolbar setItems:items];
@@ -1176,17 +1163,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	// Buttons
 	_previousButton.enabled = (_currentPageIndex > 0);
 	_nextButton.enabled = (_currentPageIndex < numberOfPhotos - 1);
-    
-    // Disable action button if there is no image or it's a video
-    MWPhoto *photo = [self photoAtIndex:_currentPageIndex];
-    if ([photo underlyingImage] == nil || ([photo respondsToSelector:@selector(isVideo)] && photo.isVideo)) {
-        _actionButton.enabled = NO;
-        _actionButton.tintColor = [UIColor clearColor]; // Tint to hide button
-    } else {
-        _actionButton.enabled = YES;
-        _actionButton.tintColor = nil;
-    }
-	
 }
 
 - (void)jumpToPageAtIndex:(NSUInteger)index animated:(BOOL)animated {
@@ -1449,14 +1425,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     [_gridController.view layoutIfNeeded];
     [_gridController adjustOffsetsAsRequired];
     
-    // Hide action button on nav bar if it exists
-    if (self.navigationItem.rightBarButtonItem == _actionButton) {
-        _gridPreviousRightNavItem = _actionButton;
-        [self.navigationItem setRightBarButtonItem:nil animated:YES];
-    } else {
-        _gridPreviousRightNavItem = nil;
-    }
-    
     // Update
     [self updateNavigation];
     [self setControlsHidden:NO animated:YES permanent:YES];
@@ -1481,11 +1449,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
     // Remember previous content offset
     _currentGridContentOffset = _gridController.collectionView.contentOffset;
-    
-    // Restore action button if it was removed
-    if (_gridPreviousRightNavItem == _actionButton && _actionButton) {
-        [self.navigationItem setRightBarButtonItem:_gridPreviousRightNavItem animated:YES];
-    }
     
     // Position prior to hide animation
     CGRect newPagingFrame = [self frameForPagingScrollView];
@@ -1763,105 +1726,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
 - (id<UIViewControllerInteractiveTransitioning>)interactionControllerForPresentation:(id<UIViewControllerAnimatedTransitioning>)animator {
     return nil;
-}
-
-#pragma mark - Actions
-
-- (void)actionButtonPressed:(id)sender {
-
-    // Only react when image has loaded
-    id <MWPhoto> photo = [self photoAtIndex:_currentPageIndex];
-    if ([self numberOfPhotos] > 0 && [photo underlyingImage]) {
-        
-        // If they have defined a delegate method then just message them
-        if ([self.delegate respondsToSelector:@selector(photoBrowser:actionButtonPressedForPhotoAtIndex:)]) {
-            
-            // Let delegate handle things
-            [self.delegate photoBrowser:self actionButtonPressedForPhotoAtIndex:_currentPageIndex];
-            
-        } else {
-            
-            // Show activity view controller
-            NSMutableArray *items = [NSMutableArray arrayWithObject:[photo underlyingImage]];
-            if (photo.caption) {
-                [items addObject:photo.caption];
-            }
-            self.activityViewController = [[UIActivityViewController alloc] initWithActivityItems:items applicationActivities:nil];
-            
-            // Show loading spinner after a couple of seconds
-            double delayInSeconds = 2.0;
-            dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-            dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-                if (self.activityViewController) {
-                    [self showProgressHUDWithMessage:nil];
-                }
-            });
-
-            // Show
-            typeof(self) __weak weakSelf = self;
-            [self.activityViewController setCompletionWithItemsHandler:^(UIActivityType  _Nullable activityType, BOOL completed, NSArray * _Nullable returnedItems, NSError * _Nullable activityError) {
-                weakSelf.activityViewController = nil;
-                [weakSelf hideControlsAfterDelay];
-                [weakSelf hideProgressHUD:YES];
-            }];
-//            [self.activityViewController setCompletionHandler:^(NSString *activityType, BOOL completed) {
-//                weakSelf.activityViewController = nil;
-//                [weakSelf hideControlsAfterDelay];
-//                [weakSelf hideProgressHUD:YES];
-//            }];
-            
-            // iOS 8 - Set the Anchor Point for the popover
-            self.activityViewController.popoverPresentationController.barButtonItem = _actionButton;
-//            if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"8")) {
-//                self.activityViewController.popoverPresentationController.barButtonItem = _actionButton;
-//            }
-            [self presentViewController:self.activityViewController animated:YES completion:nil];
-
-        }
-        
-        // Keep controls hidden
-        [self setControlsHidden:NO animated:YES permanent:YES];
-
-    }
-    
-}
-
-#pragma mark - Action Progress
-
-- (MBProgressHUD *)progressHUD {
-    if (!_progressHUD) {
-        _progressHUD = [[MBProgressHUD alloc] initWithView:self.view];
-        _progressHUD.minSize = CGSizeMake(120, 120);
-        _progressHUD.minShowTime = 1;
-        [self.view addSubview:_progressHUD];
-    }
-    return _progressHUD;
-}
-
-- (void)showProgressHUDWithMessage:(NSString *)message {
-    self.progressHUD.label.text = message;
-    self.progressHUD.mode = MBProgressHUDModeIndeterminate;
-    [self.progressHUD showAnimated:YES];
-    self.navigationController.navigationBar.userInteractionEnabled = NO;
-}
-
-- (void)hideProgressHUD:(BOOL)animated {
-    [self.progressHUD hideAnimated:animated];
-    self.navigationController.navigationBar.userInteractionEnabled = YES;
-}
-
-- (void)showProgressHUDCompleteMessage:(NSString *)message {
-    if (message) {
-        if (self.progressHUD.isHidden) [self.progressHUD showAnimated:YES];
-        self.progressHUD.label.text = message;
-        // 使用 HUD 自带的文字样式，不传 customView（原先设为 CustomView 却没给
-        // customView 赋值，结果是一个只有文字的空弹窗）
-        self.progressHUD.mode = MBProgressHUDModeText;
-        [self.progressHUD hideAnimated:YES afterDelay:1.5];
-    } else {
-        [self.progressHUD hideAnimated:YES];
-    }
-    self.navigationController.navigationBar.userInteractionEnabled = YES;
 }
 
 @end

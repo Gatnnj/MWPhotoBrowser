@@ -7,7 +7,6 @@
 //
 
 #import <UIKit/UIKit.h>
-#import <MBProgressHUD/MBProgressHUD.h>
 // MediaPlayer 框架（MPMoviePlayerViewController，iOS 9 废弃）已移除，
 // 现代播放器 AVPlayerViewController 位于 AVKit，在 .m 中导入
 #import "MWGridViewController.h"
@@ -42,13 +41,11 @@
 	UIToolbar *_toolbar;
 	NSTimer *_controlVisibilityTimer;
     dispatch_block_t _pendingTapToggleBlock; // 排队中的单击切换显隐，可被双击或退出取消
-	UIBarButtonItem *_previousButton, *_nextButton, *_actionButton, *_doneButton;
-    MBProgressHUD *_progressHUD;
+	UIBarButtonItem *_previousButton, *_nextButton, *_doneButton;
     
     // Grid
     MWGridViewController *_gridController;
     UIBarButtonItem *_gridPreviousLeftNavItem;
-    UIBarButtonItem *_gridPreviousRightNavItem;
     
     // Appearance
     BOOL _previousNavBarHidden;
@@ -71,7 +68,6 @@
     BOOL _hasBelongedToViewController;
     // _isVCBasedStatusBarAppearance 已移除：iOS 13 起状态栏外观统一由 VC 管理
     BOOL _statusBarShouldBeHidden;
-    BOOL _displayActionButton;
     BOOL _leaveStatusBarAlone;
 	BOOL _performingLayout;
 	BOOL _rotating;
@@ -84,7 +80,6 @@
 }
 
 // Properties
-@property (nonatomic) UIActivityViewController *activityViewController;
 // 自定义转场的交互控制器（拖拽关闭），启用丝滑转场时创建
 @property (nonatomic, strong) MWPhotoInteractiveTransition *interactiveTransition;
 

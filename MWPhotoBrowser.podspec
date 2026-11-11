@@ -41,7 +41,8 @@ Pod::Spec.new do |s|
   # 替换为视频所需的 AVKit/AVFoundation，Photos 由弱框架改为强依赖
   s.frameworks = 'ImageIO', 'QuartzCore', 'AVKit', 'AVFoundation', 'Photos'
 
-  s.dependency 'MBProgressHUD', '~> 1.2.0'
+  # MBProgressHUD 已移除：库内唯一的用途是分享按钮的加载提示，
+  # 该分享按钮与对应 delegate 方法已一并删除，无需第三方 HUD
 
   # DACircularProgress 已移除：内置进度环改用 MWCircularProgressView
   # （CAShapeLayer + strokeEnd 实现），不再依赖第三方库

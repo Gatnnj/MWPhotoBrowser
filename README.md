@@ -57,7 +57,6 @@ video.videoURL = [[NSURL alloc] initWithString:@"https://scontent.cdninstagram.c
 MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
 
 // Set options
-browser.displayActionButton = YES; // Show action button to allow sharing, copying, etc (defaults to YES)
 browser.displayNavArrows = NO; // Whether to display left and right nav arrows on toolbar (defaults to NO)
 browser.displaySelectionButtons = NO; // Whether selection buttons are shown on each image (defaults to NO)
 browser.zoomPhotosToFill = YES; // Images that almost fill the screen will be initially zoomed to fill (defaults to YES)
@@ -142,19 +141,6 @@ In order to properly show the grid of thumbnails, you must ensure the property `
 ```
 
 The photo browser can also start on the grid by enabling the `startOnGrid` property.
-
-
-### Actions
-
-By default, if the action button is visible then the image (and caption if it exists) are sent to a UIActivityViewController.
-
-You can provide a custom action by implementing the following delegate method:
-
-```obj-c
-- (void)photoBrowser:(MWPhotoBrowser *)photoBrowser actionButtonPressedForPhotoAtIndex:(NSUInteger)index {
-    // Do your thing!
-}
-```
 
 
 ### Photo Captions

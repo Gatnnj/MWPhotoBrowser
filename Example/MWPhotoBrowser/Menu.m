@@ -184,7 +184,6 @@
 	NSMutableArray *photos = [[NSMutableArray alloc] init];
 	NSMutableArray *thumbs = [[NSMutableArray alloc] init];
     MWPhoto *photo, *thumb;
-    BOOL displayActionButton = YES;
     BOOL displaySelectionButtons = NO;
     BOOL displayNavArrows = NO;
     BOOL enableGrid = YES;
@@ -270,7 +269,6 @@
             photo = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:@"photo3t" ofType:@"jpg"]]];
 			[thumbs addObject:photo];
             // Options
-            displayActionButton = NO;
             displaySelectionButtons = YES;
             startOnGrid = indexPath.row == 4;
             enableGrid = NO;
@@ -1134,7 +1132,6 @@
 	
 	// Create browser
 	MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
-    browser.displayActionButton = displayActionButton;
     browser.displayNavArrows = displayNavArrows;
     browser.displaySelectionButtons = displaySelectionButtons;
     browser.alwaysShowControls = displaySelectionButtons;
@@ -1204,11 +1201,13 @@
 #pragma mark - 丝滑转场演示
 
 - (void)showSmoothTransition {
-    
-    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{}];
+    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
+        
+    }];
     
     // 1. 准备本地图片数据
     NSMutableArray *demoPhotos = [NSMutableArray array];
+//    NSArray *urls = @[@"photo1", @"photo2", @"photo2", @"photo3", @"photo4"];
     NSArray<NSString *> *urls = @[
         @"https://picsum.photos/id/1015/3840/2560",
         @"https://picsum.photos/id/1016/3840/2560",
@@ -1229,6 +1228,7 @@
 
     NSInteger index = 0;
     for (NSString *url in urls) {
+//        MWPhoto *p = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:url ofType:@"jpg"]] isBlur:[url isEqualToString:@"photo2"]];
         MWPhoto *p = [MWPhoto photoWithURL:[NSURL URLWithString:url] isBlur:[url isEqualToString:@"https://picsum.photos/id/1016/3840/2560"]];
         p.radius = index == 1 ? 30 : 20;
         [demoPhotos addObject:p];
@@ -1251,7 +1251,6 @@
     MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
     browser.enableCustomTransition = YES;
     browser.enableGrid = NO;
-    browser.displayActionButton = NO;
     [browser setCurrentPhotoIndex:0];
 
     // 4. 使用 OverFullScreen 保留底层列表，拖拽时才能透出背景
@@ -1272,8 +1271,7 @@
 // 丝滑转场：返回连贯动画的起始/飞回缩略图
 - (UIView *)photoBrowser:(MWPhotoBrowser *)photoBrowser startingViewForPhotoAtIndex:(NSUInteger)index {
     // 仅首张返回演示源视图，其余页返回 nil 由动画器自动降级
-    if (index == 0) return self.demoSourceImageView;
-    return nil;
+    return self.demoSourceImageView;
 }
 
 - (id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser photoAtIndex:(NSUInteger)index {
@@ -1292,10 +1290,6 @@
 //    MWPhoto *photo = [self.photos objectAtIndex:index];
 //    MWCaptionView *captionView = [[MWCaptionView alloc] initWithPhoto:photo];
 //    return [captionView autorelease];
-//}
-
-//- (void)photoBrowser:(MWPhotoBrowser *)photoBrowser actionButtonPressedForPhotoAtIndex:(NSUInteger)index {
-//    NSLog(@"ACTION!");
 //}
 
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser didDisplayPhotoAtIndex:(NSUInteger)index {

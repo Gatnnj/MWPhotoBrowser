@@ -66,8 +66,23 @@
             CGPoint touchPoint = [pan locationInView:root];
             CGPoint imageCenter = [image convertPoint:CGPointMake(CGRectGetMidX(image.bounds), CGRectGetMidY(image.bounds)) toView:root];
             self.touchOffset = CGPointMake(touchPoint.x - imageCenter.x, touchPoint.y - imageCenter.y);
-            self.dragSnapshot = [image snapshotViewAfterScreenUpdates:NO];
-            if (!self.dragSnapshot) break;
+            // UIImageView.snapshotViewAfterScreenUpdates: can produce a blank
+            // snapshot for an image that was just installed by an async loader
+            // (network/blur completion). Build the drag view from the actual
+            // UIImage instead, so the dragged content is independent of the
+            // source view's backing layer and reuse lifecycle.
+            UIImage *displayedImage = [image isKindOfClass:[UIImageView class]] ? ((UIImageView *)image).image : nil;
+            if (!displayedImage) break;
+            UIImageView *imageSnapshot = [[UIImageView alloc] initWithImage:displayedImage];
+            // The source image view is zoomed by its enclosing UIScrollView,
+            // so its screen-space frame is smaller than UIImage.size. Reuse
+            // that converted frame as the snapshot's bounds and scale the
+            // bitmap into it; UIViewContentModeCenter would draw at the raw
+            // pixel size and look enlarged/cropped during the drag.
+            imageSnapshot.contentMode = UIViewContentModeScaleToFill;
+            imageSnapshot.clipsToBounds = image.clipsToBounds;
+            imageSnapshot.backgroundColor = UIColor.clearColor;
+            self.dragSnapshot = imageSnapshot;
             self.dragSnapshot.frame = self.originalFrame;
             [window addSubview:self.dragSnapshot];
             image.hidden = YES;
@@ -150,7 +165,10 @@
 
 - (BOOL)gestureRecognizerShouldBegin:(UIPanGestureRecognizer *)gesture {
     UIView *image = self.currentImageViewBlock ? self.currentImageViewBlock() : nil;
-    if (!image || !image.window) return NO;
+    // While a network photo is still loading the page's UIImageView exists but
+    // has no image. Starting the interaction would hide that view and drag a
+    // black placeholder, so wait until real image content is available.
+    if (![image isKindOfClass:[UIImageView class]] || !image.window || !((UIImageView *)image).image) return NO;
     CGPoint velocity = [gesture velocityInView:gesture.view];
     return velocity.y > 0 && velocity.y > fabs(velocity.x) * 1.15;
 }
