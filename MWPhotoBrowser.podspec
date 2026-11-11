@@ -10,24 +10,15 @@ Pod::Spec.new do |s|
                   The photo browser handles the downloading and caching of photos from the web seamlessly.
                   Photos can be zoomed and panned, and optional (customisable) captions can be displayed.
                   DESCRIPTION
-  s.screenshots = [
-    'https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser1.png',
-    'https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser2.png',
-    'https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser3.png',
-    'https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser4.png',
-    'https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser5.png',
-    'https://raw.github.com/mwaterfall/MWPhotoBrowser/master/Screenshots/MWPhotoBrowser6.png'
-  ]
 
-  s.homepage = 'https://github.com/mwaterfall/MWPhotoBrowser'
-  s.author = { 'Michael Waterfall' => 'michaelwaterfall@gmail.com' }
-  s.social_media_url = 'https://twitter.com/mwaterfall'
+  s.homepage = 'https://github.com/Gatnnj/MWPhotoBrowser.git'
+  s.author = { 'Gatnnj' => 'gatnnj880@gmail.com' }
 
   s.source = {
-    :git => 'https://github.com/mwaterfall/MWPhotoBrowser.git',
+    :git => 'https://github.com/Gatnnj/MWPhotoBrowser.git',
     :tag => '2.1.2'
   }
-  s.platform = :ios, '15.0'
+  s.platform = :ios, '13.0'
   s.source_files = 'Pod/Classes/**/*'
   # 图标统一收进 asset catalog：打包时由 actool 编译进 MWPhotoBrowser.bundle 的 Assets.car。
   # 好处是只保留一份源文件、自动匹配 @1x/@2x/@3x、支持 App Thinning / Dark Mode，
@@ -40,12 +31,6 @@ Pod::Spec.new do |s|
   # AssetsLibrary、MediaPlayer 已移除（iOS 9 废弃），
   # 替换为视频所需的 AVKit/AVFoundation，Photos 由弱框架改为强依赖
   s.frameworks = 'ImageIO', 'QuartzCore', 'AVKit', 'AVFoundation', 'Photos'
-
-  # MBProgressHUD 已移除：库内唯一的用途是分享按钮的加载提示，
-  # 该分享按钮与对应 delegate 方法已一并删除，无需第三方 HUD
-
-  # DACircularProgress 已移除：内置进度环改用 MWCircularProgressView
-  # （CAShapeLayer + strokeEnd 实现），不再依赖第三方库
 
   # SDWebImage
   # 3.7.2 contains bugs downloading local files
