@@ -1,6 +1,0 @@
-module Pods_MWPhotoBrowser_Tests {
-  umbrella header "Pods-MWPhotoBrowser_Tests-umbrella.h"
-
-  export *
-  module * { export * }
-}

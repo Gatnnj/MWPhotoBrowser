@@ -7,6 +7,10 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "MWGridViewController.h"
+#import "MWZoomingScrollView.h"
+#import "MWToolBar.h"
+
 @class MWPhotoInteractiveTransition;
 @class MWPhotoTransitionAnimator;
 
