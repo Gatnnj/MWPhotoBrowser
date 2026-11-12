@@ -66,7 +66,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     _currentPageIndex = 0;
     _previousPageIndex = NSUIntegerMax;
     _currentVideoIndex = NSUIntegerMax;
-    _displayNavArrows = NO;
     _zoomPhotosToFill = YES;
     _performingLayout = NO; // Reset on view did appear
     _rotating = NO;
@@ -173,24 +172,11 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	[self.view addSubview:_pagingScrollView];
 	
     // Toolbar
-    _toolbar = [[UIToolbar alloc] initWithFrame:[self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]]];
-    _toolbar.tintColor = [UIColor whiteColor];
-    _toolbar.barTintColor = nil;
-    [_toolbar setBackgroundImage:nil forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsDefault];
-    // LandscapePhone metrics（iOS 8 废弃）已移除：现代系统横屏统一使用 Default metrics
-    // UIBarStyleBlackTranslucent（iOS 13 废弃）替换为 UIBarStyleBlack + 显式 translucent
-    _toolbar.barStyle = UIBarStyleBlack;
-    _toolbar.translucent = YES;
-    _toolbar.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleWidth;
-    
-    // Toolbar Items
-    if (self.displayNavArrows) {
-        UIImage *previousButtonImage = [UIImage mw_imageNamed:@"UIBarButtonItemArrowLeft"];
-        UIImage *nextButtonImage = [UIImage mw_imageNamed:@"UIBarButtonItemArrowRight"];
-        _previousButton = [[UIBarButtonItem alloc] initWithImage:previousButtonImage style:UIBarButtonItemStylePlain target:self action:@selector(gotoPreviousPage)];
-        _nextButton = [[UIBarButtonItem alloc] initWithImage:nextButtonImage style:UIBarButtonItemStylePlain target:self action:@selector(gotoNextPage)];
-    }
-    // Action（分享）按钮已移除：分享入口交由宿主自行实现
+    _toolbar = [[MWToolBar alloc] initWithFrame:[self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]]];
+    _toolbar.clipsToBounds = YES;
+    [self.view addSubview:_toolbar];
+    [_toolbar setHidden:_isHiddenToolBar];
+
 
     // 自定义丝滑转场：交互控制器把手势装在根视图，只对内部图片视图做 transform
     // （对照 JXPhotoBrowser），因此与 reloadData 先后顺序无关
@@ -308,34 +294,10 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         [items addObject:fixedSpace];
     }
 
-    // Middle - Nav
-    if (_previousButton && _nextButton && numberOfPhotos > 1) {
-        [items addObject:flexSpace];
-        [items addObject:_previousButton];
-        [items addObject:flexSpace];
-        [items addObject:_nextButton];
-        [items addObject:flexSpace];
-    } else {
-        [items addObject:flexSpace];
-    }
-
     // Right - 分享按钮已移除，仅保留右侧留白维持布局平衡
     [items addObject:fixedSpace];
 
     // Toolbar visibility
-    [_toolbar setItems:items];
-    BOOL hideToolbar = YES;
-    for (UIBarButtonItem* item in _toolbar.items) {
-        if (item != fixedSpace && item != flexSpace) {
-            hideToolbar = NO;
-            break;
-        }
-    }
-    if (hideToolbar) {
-        [_toolbar removeFromSuperview];
-    } else {
-        [self.view addSubview:_toolbar];
-    }
     
     // Update nav
 	[self updateNavigation];
@@ -345,6 +307,11 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     [self tilePages];
     _performingLayout = NO;
     
+}
+
+/// add toolBar
+- (void)customToolBarItems:(NSArray<UIButton *> *)array{
+    [_toolbar addItems:array];
 }
 
 // 旧的 viewDidUnload（iOS 6 废弃）已整体移除：iOS 6 起系统不再调用该方法，
@@ -1060,10 +1027,11 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 }
 
 - (CGRect)frameForToolbarAtOrientation:(UIInterfaceOrientation)orientation {
-    CGFloat height = 44;
+    CGFloat width = self.view.bounds.size.width;
+    CGFloat height = 83;
     if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone &&
-        UIInterfaceOrientationIsLandscape(orientation)) height = 32;
-	return CGRectIntegral(CGRectMake(0, self.view.bounds.size.height - height, self.view.bounds.size.width, height));
+        UIInterfaceOrientationIsLandscape(orientation)) height = self.view.bounds.size.width;
+    return CGRectIntegral(CGRectMake(0, self.view.bounds.size.height - height, width, height));
 }
 
 - (CGRect)frameForCaptionView:(MWCaptionView *)captionView atIndex:(NSUInteger)index {
@@ -1140,7 +1108,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     NSUInteger numberOfPhotos = [self numberOfPhotos];
     if (_gridController) {
         if (_gridController.selectionMode) {
-            self.title = NSLocalizedString(@"Select Photos", nil);
+            self.navigationItem.title = NSLocalizedString(@"Select Photos", nil);
         } else {
             NSString *photosText;
             if (numberOfPhotos == 1) {
@@ -1148,21 +1116,17 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
             } else {
                 photosText = NSLocalizedString(@"photos", @"Used in the context: '3 photos'");
             }
-            self.title = [NSString stringWithFormat:@"%lu %@", (unsigned long)numberOfPhotos, photosText];
+            self.navigationItem.title = [NSString stringWithFormat:@"%lu %@", (unsigned long)numberOfPhotos, photosText];
         }
     } else if (numberOfPhotos > 1) {
         if ([_delegate respondsToSelector:@selector(photoBrowser:titleForPhotoAtIndex:)]) {
-            self.title = [_delegate photoBrowser:self titleForPhotoAtIndex:_currentPageIndex];
+            self.navigationItem.title = [_delegate photoBrowser:self titleForPhotoAtIndex:_currentPageIndex];
         } else {
-            self.title = [NSString stringWithFormat:@"%lu %@ %lu", (unsigned long)(_currentPageIndex+1), NSLocalizedString(@"of", @"Used in the context: 'Showing 1 of 3 items'"), (unsigned long)numberOfPhotos];
+            self.navigationItem.title = [NSString stringWithFormat:@"%lu %@ %lu", (unsigned long)(_currentPageIndex+1), NSLocalizedString(@"of", @"Used in the context: 'Showing 1 of 3 items'"), (unsigned long)numberOfPhotos];
         }
 	} else {
-		self.title = nil;
+		self.navigationItem.title = nil;
 	}
-	
-	// Buttons
-	_previousButton.enabled = (_currentPageIndex > 0);
-	_nextButton.enabled = (_currentPageIndex < numberOfPhotos - 1);
 }
 
 - (void)jumpToPageAtIndex:(NSUInteger)index animated:(BOOL)animated {

@@ -52,11 +52,12 @@
 
 @property (nonatomic, weak) IBOutlet id<MWPhotoBrowserDelegate> delegate;
 @property (nonatomic) BOOL zoomPhotosToFill;
-@property (nonatomic) BOOL displayNavArrows;
 @property (nonatomic) BOOL displaySelectionButtons;
 @property (nonatomic) BOOL alwaysShowControls;
 @property (nonatomic) BOOL enableGrid;
 @property (nonatomic) BOOL enableSwipeToDismiss;
+@property (nonatomic) BOOL isHiddenToolBar;
+
 // 是否启用自定义丝滑转场（连贯放大 + 拖拽关闭），默认 NO 保持原有行为；
 // 启用后需以 UIModalPresentationOverFullScreen 呈现（保留底层视图以支持拖拽透底），
 // 并把包装用导航控制器的 transitioningDelegate 指向本浏览器
@@ -91,4 +92,6 @@
 - (void)showNextPhotoAnimated:(BOOL)animated;
 - (void)showPreviousPhotoAnimated:(BOOL)animated;
 
+// ToolBar
+-(void)customToolBarItems:(NSArray<UIButton *> *)array;
 @end

@@ -27,7 +27,7 @@
 
 - (id)initWithCoder:(NSCoder *)aDecoder {
     if ((self = [super initWithCoder:aDecoder])) {
-		self.title = @"MWPhotoBrowser";
+		self.navigationItem.title = @"MWPhotoBrowser";
         
         // Clear cache for testing
 //        [[SDImageCache sharedImageCache] clearDisk];
@@ -1132,7 +1132,7 @@
 	
 	// Create browser
 	MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
-    browser.displayNavArrows = displayNavArrows;
+//    browser.displayNavArrows = displayNavArrows;
     browser.displaySelectionButtons = displaySelectionButtons;
     browser.alwaysShowControls = displaySelectionButtons;
     browser.zoomPhotosToFill = YES;

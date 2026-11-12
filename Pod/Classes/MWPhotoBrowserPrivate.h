@@ -11,6 +11,7 @@
 // 现代播放器 AVPlayerViewController 位于 AVKit，在 .m 中导入
 #import "MWGridViewController.h"
 #import "MWZoomingScrollView.h"
+#import "MWToolBar.h"
 
 @class AVPlayerViewController;
 @class MWPhotoInteractiveTransition;
@@ -38,10 +39,10 @@
 	NSUInteger _pageIndexBeforeRotation;
 	
 	// Navigation & controls
-	UIToolbar *_toolbar;
+    MWToolBar *_toolbar;
 	NSTimer *_controlVisibilityTimer;
     dispatch_block_t _pendingTapToggleBlock; // 排队中的单击切换显隐，可被双击或退出取消
-	UIBarButtonItem *_previousButton, *_nextButton, *_doneButton;
+	UIBarButtonItem *_doneButton;
     
     // Grid
     MWGridViewController *_gridController;
