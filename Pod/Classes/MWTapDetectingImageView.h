@@ -6,13 +6,15 @@
 //  Copyright 2009 d3i. All rights reserved.
 //
 
-#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 @protocol MWTapDetectingImageViewDelegate;
 
 @interface MWTapDetectingImageView : UIImageView {}
 
-@property (nonatomic, weak) id <MWTapDetectingImageViewDelegate> tapDelegate;
+@property (nonatomic, weak, nullable) id <MWTapDetectingImageViewDelegate> tapDelegate;
 
 @end
 
@@ -25,3 +27,5 @@
 - (void)imageView:(UIImageView *)imageView tripleTapDetected:(UITouch *)touch;
 
 @end
+
+NS_ASSUME_NONNULL_END

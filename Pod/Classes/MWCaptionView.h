@@ -9,6 +9,8 @@
 #import <UIKit/UIKit.h>
 #import "MWPhotoProtocol.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface MWCaptionView : UIToolbar
 
 // Init
@@ -31,3 +33,5 @@
 - (CGSize)sizeThatFits:(CGSize)size;
 
 @end
+
+NS_ASSUME_NONNULL_END

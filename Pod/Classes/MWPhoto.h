@@ -14,9 +14,11 @@
 // If you want to handle photos, caching, decompression
 // yourself then you can simply ensure your custom data model
 // conforms to MWPhotoProtocol
+NS_ASSUME_NONNULL_BEGIN
+
 @interface MWPhoto : NSObject <MWPhoto>
 
-@property (nonatomic, strong) NSString *caption;
+@property (nonatomic, strong, nullable) NSString *caption;
 @property (nonatomic) BOOL emptyImage;
 /// 切换后会在已加载图片上异步重新处理，并通知浏览器刷新当前页。
 @property (nonatomic) BOOL isBlur;
@@ -33,18 +35,18 @@
 /// Asynchronously remove all generated Gaussian blur files from the caches directory.
 + (void)clearBlurCache;
 /// Completion is called on the main queue after cache files are removed.
-+ (void)clearBlurCacheWithCompletion:(void (^)(void))completion;
++ (void)clearBlurCacheWithCompletion:(nullable void (^)(void))completion;
 /// Asynchronously remove generated blur files for a URL, at every radius.
 + (void)clearBlurCacheForURL:(NSURL *)url;
-+ (void)clearBlurCacheForURL:(NSURL *)url completion:(void (^)(void))completion;
++ (void)clearBlurCacheForURL:(NSURL *)url completion:(nullable void (^)(void))completion;
 /// Remove generated grid thumbnail files from the caches directory, or for one URL.
 + (void)clearZoomCache;
-+ (void)clearZoomCacheWithCompletion:(void (^)(void))completion;
++ (void)clearZoomCacheWithCompletion:(nullable void (^)(void))completion;
 + (void)clearZoomCacheForURL:(NSURL *)url;
-+ (void)clearZoomCacheForURL:(NSURL *)url completion:(void (^)(void))completion;
++ (void)clearZoomCacheForURL:(NSURL *)url completion:(nullable void (^)(void))completion;
 /// Asynchronously clear both generated blur and grid thumbnail caches.
 + (void)clearBlurAndZoomCache;
-+ (void)clearBlurAndZoomCacheWithCompletion:(void (^)(void))completion;
++ (void)clearBlurAndZoomCacheWithCompletion:(nullable void (^)(void))completion;
 
 - (id)init;
 - (id)initWithImage:(UIImage *)image;
@@ -53,4 +55,6 @@
 - (id)initWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize;
 
 @end
+
+NS_ASSUME_NONNULL_END
 

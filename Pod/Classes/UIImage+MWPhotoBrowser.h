@@ -8,6 +8,8 @@
 
 #import <UIKit/UIKit.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface UIImage (MWPhotoBrowser)
 
 /// 库自身资源所在 bundle。
@@ -21,21 +23,23 @@
 + (nullable UIImage *)mw_imageNamed:(nonnull NSString *)name;
 
 /// 旧接口，保留以兼容外部调用；已改为按资源名解析，不再依赖 "XXX.bundle/YYY" 这类硬编码路径。
-+ (UIImage *)imageForResourcePath:(NSString *)path ofType:(NSString *)type inBundle:(NSBundle *)bundle;
++ (nullable UIImage *)imageForResourcePath:(NSString *)path ofType:(NSString *)type inBundle:(NSBundle *)bundle;
 + (UIImage *)clearImageWithSize:(CGSize)size;
 + (UIImage *)gaussianBlurWithImage:(UIImage *)originalImage ofRadius:(CGFloat)radius;
 
 
 /// 压缩图片
-+ (NSData *)mwCompressImage:(UIImage *)image;
++ (nullable NSData *)mwCompressImage:(UIImage *)image;
 
 /// 生成适合浏览展示的 JPEG 缩略图：最长边不超过 1280 像素，目标文件大小约 300 KB。
 + (nullable NSData *)mwCompressImageForThumbnail:(UIImage *)image;
 
 /// @maskName 水印名
-+ (NSData *)mwCompressImage:(UIImage *)image withMask:(NSString *)maskName;
++ (nullable NSData *)mwCompressImage:(UIImage *)image withMask:(nullable NSString *)maskName;
 
 /// @imageName 自定义图片水印 图片名
-+ (NSData *)mwCompressImage:(UIImage *)image withCustomImage:(NSString *)imageName;
++ (nullable NSData *)mwCompressImage:(UIImage *)image withCustomImage:(nullable NSString *)imageName;
 
 @end
+
+NS_ASSUME_NONNULL_END

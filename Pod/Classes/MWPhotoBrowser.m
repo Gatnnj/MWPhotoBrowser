@@ -240,7 +240,6 @@
     
     // Setup
     _performingLayout = YES;
-    NSUInteger numberOfPhotos = [self numberOfPhotos];
     
 	// Setup pages
     [_visiblePages removeAllObjects];
@@ -307,9 +306,6 @@
 - (void)customToolBarItems:(NSArray<UIButton *> *)array{
     [_toolbar addItems:array];
 }
-
-// 旧的 viewDidUnload（iOS 6 废弃）已整体移除：iOS 6 起系统不再调用该方法，
-// 低内存时的视图释放由系统自动管理，无需手动置空子视图
 
 - (BOOL)presentingViewControllerPrefersStatusBarHidden {
     UIViewController *presenting = self.presentingViewController;

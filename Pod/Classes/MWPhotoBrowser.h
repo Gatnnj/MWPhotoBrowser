@@ -18,6 +18,8 @@
 #define MWLog(x, ...)
 #endif
 
+NS_ASSUME_NONNULL_BEGIN
+
 @class MWPhotoBrowser;
 
 /// Optional progress hook for custom loading views. Views without this method can show an indeterminate animation.
@@ -33,13 +35,13 @@
 
 @optional
 
-- (id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser thumbPhotoAtIndex:(NSUInteger)index;
+- (nullable id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser thumbPhotoAtIndex:(NSUInteger)index;
 
 // 丝滑转场（可选）：返回该图片在列表中的缩略图视图，浏览器会从该视图位置
 // 连贯放大进入、关闭时飞回该位置；不实现则自动降级为渐隐，老调用方完全兼容
-- (UIView *)photoBrowser:(MWPhotoBrowser *)photoBrowser startingViewForPhotoAtIndex:(NSUInteger)index;
-- (MWCaptionView *)photoBrowser:(MWPhotoBrowser *)photoBrowser captionViewForPhotoAtIndex:(NSUInteger)index;
-- (NSString *)photoBrowser:(MWPhotoBrowser *)photoBrowser titleForPhotoAtIndex:(NSUInteger)index;
+- (nullable UIView *)photoBrowser:(MWPhotoBrowser *)photoBrowser startingViewForPhotoAtIndex:(NSUInteger)index;
+- (nullable MWCaptionView *)photoBrowser:(MWPhotoBrowser *)photoBrowser captionViewForPhotoAtIndex:(NSUInteger)index;
+- (nullable NSString *)photoBrowser:(MWPhotoBrowser *)photoBrowser titleForPhotoAtIndex:(NSUInteger)index;
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser didDisplayPhotoAtIndex:(NSUInteger)index;
 - (BOOL)photoBrowser:(MWPhotoBrowser *)photoBrowser isPhotoSelectedAtIndex:(NSUInteger)index;
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser photoAtIndex:(NSUInteger)index selectedChanged:(BOOL)selected;
@@ -50,7 +52,7 @@
 // UIActionSheetDelegate 已移除：该协议自 iOS 8 废弃，且本类没有实现任何 UIActionSheet 相关方法，属于历史残留
 @interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate, UIViewControllerTransitioningDelegate>
 
-@property (nonatomic, weak) IBOutlet id<MWPhotoBrowserDelegate> delegate;
+@property (nonatomic, weak, nullable) id<MWPhotoBrowserDelegate> delegate;
 @property (nonatomic) BOOL zoomPhotosToFill;
 @property (nonatomic) BOOL displaySelectionButtons;
 @property (nonatomic) BOOL alwaysShowControls;
@@ -68,8 +70,8 @@
 
 // Customise image selection icons as they are the only icons with a colour tint
 // Icon should be located in the app's main bundle
-@property (nonatomic, strong) NSString *customImageSelectedIconName;
-@property (nonatomic, strong) NSString *customImageSelectedSmallIconName;
+@property (nonatomic, strong, nullable) NSString *customImageSelectedIconName;
+@property (nonatomic, strong, nullable) NSString *customImageSelectedSmallIconName;
 
 /// Optional factory for loading indicators used by zoom pages and grid cells.
 /// Return a new configured view, or nil to use the built-in progress indicator.
@@ -94,3 +96,5 @@
 // ToolBar
 -(void)customToolBarItems:(NSArray<UIButton *> *)array;
 @end
+
+NS_ASSUME_NONNULL_END

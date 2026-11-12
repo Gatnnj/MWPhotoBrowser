@@ -13,14 +13,16 @@
 
 @class MWPhotoBrowser, MWPhoto, MWCaptionView;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate> {
 
 }
 
 @property () NSUInteger index;
-@property (nonatomic) id <MWPhoto> photo;
-@property (nonatomic, weak) MWCaptionView *captionView;
-@property (nonatomic, weak) UIButton *selectedButton;
+@property (nonatomic, nullable) id <MWPhoto> photo;
+@property (nonatomic, weak, nullable) MWCaptionView *captionView;
+@property (nonatomic, weak, nullable) UIButton *selectedButton;
 
 - (id)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
 - (void)displayImage;
@@ -30,12 +32,14 @@
 - (void)setImageHidden:(BOOL)hidden;
 
 // 暴露所属浏览器，供交互控制器复位时重算布局
-- (MWPhotoBrowser *)photoBrowser;
+- (nullable MWPhotoBrowser *)photoBrowser;
 
 // 暴露内部图片视图，供自定义转场获取其当前位置（含拖拽后的 transform）
-- (UIView *)photoImageViewForTransition;
+- (nullable UIView *)photoImageViewForTransition;
 
 // 统一设置页面内部黑色背景的透明度（不影响图片本身），用于拖拽时背景渐隐
 - (void)setBackgroundAlpha:(CGFloat)alpha;
 
 @end
+
+NS_ASSUME_NONNULL_END

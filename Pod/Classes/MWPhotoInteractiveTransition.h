@@ -8,6 +8,8 @@
 
 #import <UIKit/UIKit.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @class MWZoomingScrollView;
 
 @interface MWPhotoInteractiveTransition : NSObject
@@ -25,14 +27,14 @@
 /// @param setPagingEnabled 控制分页 scrollView 是否可滚动
 /// @param setBackgroundAlpha 控制背景透明度
 /// @param dismissBlock 松手判定关闭时回调
-- (instancetype)initWithCurrentImageViewBlock:(UIView * (^)(void))currentImageViewBlock
+- (instancetype)initWithCurrentImageViewBlock:(UIView * _Nullable (^)(void))currentImageViewBlock
                             setPagingEnabled:(void (^)(BOOL enabled))setPagingEnabled
                            setBackgroundAlpha:(void (^)(CGFloat alpha))setBackgroundAlpha
-                           dismissTargetBlock:(UIView * (^)(void))dismissTargetBlock
+                           dismissTargetBlock:(nullable UIView * _Nullable (^)(void))dismissTargetBlock
                                  dismissBlock:(void (^)(void))dismissBlock;
 
 /// 兼容旧初始化接口
-- (instancetype)initWithCurrentImageViewBlock:(UIView * (^)(void))currentImageViewBlock
+- (instancetype)initWithCurrentImageViewBlock:(UIView * _Nullable (^)(void))currentImageViewBlock
                             setPagingEnabled:(void (^)(BOOL enabled))setPagingEnabled
                            setBackgroundAlpha:(void (^)(CGFloat alpha))setBackgroundAlpha
                                  dismissBlock:(void (^)(void))dismissBlock;
@@ -41,3 +43,5 @@
 - (void)installGestureOnRootView:(UIView *)rootView;
 
 @end
+
+NS_ASSUME_NONNULL_END
