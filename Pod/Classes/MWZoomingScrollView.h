@@ -21,14 +21,12 @@
 @property (nonatomic) id <MWPhoto> photo;
 @property (nonatomic, weak) MWCaptionView *captionView;
 @property (nonatomic, weak) UIButton *selectedButton;
-@property (nonatomic, weak) UIButton *playButton;
 
 - (id)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
 - (void)displayImage;
 - (void)displayImageFailure;
 - (void)setMaxMinZoomScalesForCurrentBounds;
 - (void)prepareForReuse;
-- (BOOL)displayingVideo;
 - (void)setImageHidden:(BOOL)hidden;
 
 // 暴露所属浏览器，供交互控制器复位时重算布局

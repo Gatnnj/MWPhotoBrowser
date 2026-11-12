@@ -3,10 +3,10 @@ Pod::Spec.new do |s|
   s.name = 'MWPhotoBrowser'
   s.version = '3.0.0'
   s.license = 'MIT'
-  s.summary = 'A simple iOS photo and video browser with optional grid view, captions and selections.'
+  s.summary = 'A simple iOS photo browser with optional grid view, captions and selections.'
   s.description = <<-DESCRIPTION
-                  MWPhotoBrowser can display one or more images or videos by providing either UIImage
-                  objects, PHAsset objects, or URLs to library assets, web images/videos or local files.
+                  MWPhotoBrowser can display one or more images by providing UIImage objects,
+                  PHAsset objects, or URLs to library assets, web images or local files.
                   The photo browser handles the downloading and caching of photos from the web seamlessly.
                   Photos can be zoomed and panned, and optional (customisable) captions can be displayed.
                   DESCRIPTION

@@ -203,7 +203,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     BOOL _loadingInProgress;
     id <SDWebImageOperation> _webImageOperation;
     PHImageRequestID _assetRequestID;
-    PHImageRequestID _assetVideoRequestID;
     NSUInteger _loadGeneration;
         
 }
@@ -333,9 +332,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     return [[MWPhoto alloc] initWithAsset:asset targetSize:targetSize];
 }
 
-+ (MWPhoto *)videoWithURL:(NSURL *)url {
-    return [[MWPhoto alloc] initWithVideoURL:url];
-}
 
 #pragma mark - Init
 
@@ -377,61 +373,19 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     if ((self = [super init])) {
         self.asset = asset;
         self.assetTargetSize = targetSize;
-        self.isVideo = asset.mediaType == PHAssetMediaTypeVideo;
         [self setup];
     }
     return self;
 }
 
-- (id)initWithVideoURL:(NSURL *)url {
-    if ((self = [super init])) {
-        self.videoURL = url;
-        self.isVideo = YES;
-        self.emptyImage = YES;
-        [self setup];
-    }
-    return self;
-}
 
 - (void)setup {
     _assetRequestID = PHInvalidImageRequestID;
-    _assetVideoRequestID = PHInvalidImageRequestID;
     if (_radius <= 0) _radius = 30.0;
 }
 
 - (void)dealloc {
     [self cancelAnyLoading];
-}
-
-#pragma mark - Video
-
-- (void)setVideoURL:(NSURL *)videoURL {
-    _videoURL = videoURL;
-    self.isVideo = YES;
-}
-
-- (void)getVideoURL:(void (^)(NSURL *url))completion {
-    if (_videoURL) {
-        completion(_videoURL);
-    } else if (_asset && _asset.mediaType == PHAssetMediaTypeVideo) {
-        [self cancelVideoRequest]; // Cancel any existing
-        PHVideoRequestOptions *options = [PHVideoRequestOptions new];
-        options.networkAccessAllowed = YES;
-        typeof(self) __weak weakSelf = self;
-        _assetVideoRequestID = [[PHImageManager defaultManager] requestAVAssetForVideo:_asset options:options resultHandler:^(AVAsset *asset, AVAudioMix *audioMix, NSDictionary *info) {
-            
-            // dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{ // Testing
-            typeof(self) strongSelf = weakSelf;
-            if (!strongSelf) return;
-            strongSelf->_assetVideoRequestID = PHInvalidImageRequestID;
-            if ([asset isKindOfClass:[AVURLAsset class]]) {
-                completion(((AVURLAsset *)asset).URL);
-            } else {
-                completion(nil);
-            }
-            
-        }];
-    }
 }
 
 #pragma mark - MWPhoto Protocol Methods
@@ -792,7 +746,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
         _loadingInProgress = NO;
     }
     [self cancelImageRequest];
-    [self cancelVideoRequest];
 }
 
 - (void)cancelImageRequest {
@@ -802,11 +755,5 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
-- (void)cancelVideoRequest {
-    if (_assetVideoRequestID != PHInvalidImageRequestID) {
-        [[PHImageManager defaultManager] cancelImageRequest:_assetVideoRequestID];
-        _assetVideoRequestID = PHInvalidImageRequestID;
-    }
-}
 
 @end

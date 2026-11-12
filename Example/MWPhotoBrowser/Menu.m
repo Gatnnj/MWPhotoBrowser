@@ -94,8 +94,8 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    // 固定项新增“丝滑转场演示”一行，故基础行数由 9 改为 10
-    NSInteger rows = 10;
+    // 固定图片示例共 8 项，资源库照片行按资源状态显示
+    NSInteger rows = 8;
     @synchronized(_assets) {
         if (_assets.count) rows++;
     }
@@ -120,7 +120,7 @@
             break;
         }
 		case 1: {
-            cell.textLabel.text = @"Multiple photos and video";
+            cell.textLabel.text = @"Multiple photos";
             cell.detailTextLabel.text = @"with captions";
             break;
         }
@@ -149,23 +149,13 @@
             cell.detailTextLabel.text = @"showing grid first";
             break;
         }
-        case 7: {
-            cell.textLabel.text = @"Single video";
-            cell.detailTextLabel.text = @"with auto-play";
-            break;
-        }
-        case 8: {
-            cell.textLabel.text = @"Web videos";
-            cell.detailTextLabel.text = @"showing grid first";
-            break;
-        }
-		case 9: {
+		case 7: {
             cell.textLabel.text = @"Smooth transition";
             cell.detailTextLabel.text = @"coherent zoom & drag to dismiss (Modal)";
             break;
         }
-		case 10: {
-            cell.textLabel.text = @"Library photos and videos";
+		case 8: {
+            cell.textLabel.text = @"Library photos";
             cell.detailTextLabel.text = @"media from device library";
             break;
         }
@@ -188,7 +178,6 @@
     BOOL displayNavArrows = NO;
     BOOL enableGrid = YES;
     BOOL startOnGrid = NO;
-    BOOL autoPlayOnAppear = NO;
 	switch (indexPath.row) {
 		case 0:
             // Photos
@@ -199,7 +188,7 @@
             enableGrid = NO;
 			break;
 		case 1: {
-            // Local Photos and Videos
+            // Local Photos
             photo = [MWPhoto photoWithImage:[UIImage imageWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"photo5" ofType:@"jpg"]]];
             photo.caption = @"Fireworks";
 			[photos addObject:photo];
@@ -208,10 +197,6 @@
 			[photos addObject:photo];
             photo = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:@"photo3" ofType:@"jpg"]]];
             photo.caption = @"York Floods";
-            [photos addObject:photo];
-            photo = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:@"video_thumb" ofType:@"jpg"]]];
-            photo.videoURL = [NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:@"video" ofType:@"mp4"]];
-            photo.caption = @"Big Buck Bunny";
             [photos addObject:photo];
             photo = [MWPhoto photoWithImage:[UIImage imageWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"photo4" ofType:@"jpg"]]];
             photo.caption = @"Campervan";
@@ -1043,58 +1028,11 @@
             startOnGrid = YES;
 			break;
         case 7: {
-            
-            // Single video
-            photo = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:@"video_thumb" ofType:@"jpg"]]];
-            photo.videoURL = [NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:@"video" ofType:@"mp4"]];
-            [photos addObject:photo];
-            enableGrid = NO;
-            autoPlayOnAppear = YES;
-            break;
-            
-        }
-		case 8: {
-            
-            // Videos
-            
-            photo = [MWPhoto photoWithURL:[[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xpt1/t51.2885-15/e15/11192696_824079697688618_1761661_n.jpg"]];
-            photo.videoURL = [[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xpa1/t50.2886-16/11200303_1440130956287424_1714699187_n.mp4"];
-            [photos addObject:photo];
-            thumb = [MWPhoto photoWithURL:[[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xpt1/t51.2885-15/s150x150/e15/11192696_824079697688618_1761661_n.jpg"]];
-            thumb.isVideo = YES;
-            [thumbs addObject:thumb];
-            
-            // Test video with no poster frame
-//            photo = [MWPhoto videoWithURL:[[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xfa1/t50.2886-16/11237510_945154435524423_2137519922_n.mp4"]];
-//            [photos addObject:photo];
-//            thumb = [MWPhoto new];
-//            thumb.isVideo = YES;
-//            [thumbs addObject:thumb];
-            
-            photo = [MWPhoto photoWithURL:[[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/e15/11240463_963135443745570_1519872157_n.jpg"]];
-            photo.videoURL = [[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xfa1/t50.2886-16/11237510_945154435524423_2137519922_n.mp4"];
-            [photos addObject:photo];
-            thumb = [MWPhoto photoWithURL:[[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s150x150/e15/11240463_963135443745570_1519872157_n.jpg"]];
-            thumb.isVideo = YES;
-            [thumbs addObject:thumb];
-            
-            photo = [MWPhoto photoWithURL:[[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/e15/11313531_1625089227727682_169403963_n.jpg"]];
-            photo.videoURL = [[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xfa1/t50.2886-16/11336249_1783839318509644_116225363_n.mp4"];
-            [photos addObject:photo];
-            thumb = [MWPhoto photoWithURL:[[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s150x150/e15/11313531_1625089227727682_169403963_n.jpg"]];
-            thumb.isVideo = YES;
-            [thumbs addObject:thumb];
-            
-            // Options
-            startOnGrid = YES;
-            break;
-        }
-		case 9: {
             // 丝滑转场演示：独立处理并直接返回，不走后续统一创建流程
             [self showSmoothTransition];
             return;
         }
-		case 10: {
+		case 8: {
             @synchronized(_assets) {
                 NSMutableArray *copy = [_assets copy];
                 if (NSClassFromString(@"PHAsset")) {
@@ -1116,10 +1054,6 @@
                         [photos addObject:photo];
                         MWPhoto *thumb = [MWPhoto photoWithImage:[UIImage imageWithCGImage:asset.thumbnail]];
                         [thumbs addObject:thumb];
-                        if ([asset valueForProperty:ALAssetPropertyType] == ALAssetTypeVideo) {
-                            photo.videoURL = asset.defaultRepresentation.url;
-                            thumb.isVideo = true;
-                        }
                     }
                 }
             }
@@ -1139,8 +1073,7 @@
     browser.enableGrid = enableGrid;
     browser.startOnGrid = startOnGrid;
     browser.enableSwipeToDismiss = NO;
-    browser.autoPlayOnAppear = autoPlayOnAppear;
-    [browser setCurrentPhotoIndex:0];
+        [browser setCurrentPhotoIndex:0];
     
     // Test custom selection images
 //    browser.customImageSelectedIconName = @"ImageSelected.png";
@@ -1382,7 +1315,7 @@
             void (^assetEnumerator)(ALAsset *, NSUInteger, BOOL *) = ^(ALAsset *result, NSUInteger index, BOOL *stop) {
                 if (result != nil) {
                     NSString *assetType = [result valueForProperty:ALAssetPropertyType];
-                    if ([assetType isEqualToString:ALAssetTypePhoto] || [assetType isEqualToString:ALAssetTypeVideo]) {
+                    if ([assetType isEqualToString:ALAssetTypePhoto]) {
                         [assetURLDictionaries addObject:[result valueForProperty:ALAssetPropertyURLs]];
                         NSURL *url = result.defaultRepresentation.url;
                         [_ALAssetsLibrary assetForURL:url

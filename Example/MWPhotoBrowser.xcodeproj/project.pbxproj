@@ -23,8 +23,6 @@
 		0EC5D4C21B4C46E50092ACC1 /* photo7t.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4B11B4C46E50092ACC1 /* photo7t.jpg */; };
 		0EC5D4C31B4C46E50092ACC1 /* photo8.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4B21B4C46E50092ACC1 /* photo8.jpg */; };
 		0EC5D4C41B4C46E50092ACC1 /* photo8t.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4B31B4C46E50092ACC1 /* photo8t.jpg */; };
-		0EC5D4C51B4C46E50092ACC1 /* video.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4B41B4C46E50092ACC1 /* video.mp4 */; };
-		0EC5D4C91B4C480E0092ACC1 /* video_thumb.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4C81B4C480E0092ACC1 /* video_thumb.jpg */; };
 		1942832C1E2CB74737014B98 /* libPods-MWPhotoBrowser_Tests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0769140F374815C3F8CBBF09 /* libPods-MWPhotoBrowser_Tests.a */; };
 		4C18E11B1B47E72800E3D63A /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C18E1181B47E72800E3D63A /* AppDelegate.m */; };
 		4C18E11C1B47E72800E3D63A /* Menu.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C18E11A1B47E72800E3D63A /* Menu.m */; };
@@ -118,8 +116,6 @@
 		0EC5D4B11B4C46E50092ACC1 /* photo7t.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo7t.jpg; path = "MWPhotoBrowser/Local Media/photo7t.jpg"; sourceTree = SOURCE_ROOT; };
 		0EC5D4B21B4C46E50092ACC1 /* photo8.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo8.jpg; path = "MWPhotoBrowser/Local Media/photo8.jpg"; sourceTree = SOURCE_ROOT; };
 		0EC5D4B31B4C46E50092ACC1 /* photo8t.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo8t.jpg; path = "MWPhotoBrowser/Local Media/photo8t.jpg"; sourceTree = SOURCE_ROOT; };
-		0EC5D4B41B4C46E50092ACC1 /* video.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; name = video.mp4; path = "MWPhotoBrowser/Local Media/video.mp4"; sourceTree = SOURCE_ROOT; };
-		0EC5D4C81B4C480E0092ACC1 /* video_thumb.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = video_thumb.jpg; path = "MWPhotoBrowser/Local Media/video_thumb.jpg"; sourceTree = SOURCE_ROOT; };
 		42FCB8D314CA85E2DF2C6434 /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = LICENSE; path = ../LICENSE; sourceTree = "<group>"; };
 		4BD26BB46B1DBB432DA5ADAC /* Pods-MWPhotoBrowser_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MWPhotoBrowser_Tests.release.xcconfig"; path = "Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests.release.xcconfig"; sourceTree = "<group>"; };
 		4C18E1171B47E72800E3D63A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -272,7 +268,6 @@
 		4C18E1431B47F05900E3D63A /* Local Media */ = {
 			isa = PBXGroup;
 			children = (
-				0EC5D4C81B4C480E0092ACC1 /* video_thumb.jpg */,
 				0EC5D4A41B4C46E50092ACC1 /* photo1.jpg */,
 				0EC5D4A51B4C46E50092ACC1 /* photo1t.jpg */,
 				0EC5D4A61B4C46E50092ACC1 /* photo2.jpg */,
@@ -289,7 +284,6 @@
 				0EC5D4B11B4C46E50092ACC1 /* photo7t.jpg */,
 				0EC5D4B21B4C46E50092ACC1 /* photo8.jpg */,
 				0EC5D4B31B4C46E50092ACC1 /* photo8t.jpg */,
-				0EC5D4B41B4C46E50092ACC1 /* video.mp4 */,
 			);
 			name = "Local Media";
 			path = Photos;
@@ -653,12 +647,10 @@
 				0EC5D4BB1B4C46E50092ACC1 /* photo4.jpg in Resources */,
 				0EC5D4C41B4C46E50092ACC1 /* photo8t.jpg in Resources */,
 				931651BD3098864200AAAF3F /* YBImageBrowser.bundle in Resources */,
-				0EC5D4C51B4C46E50092ACC1 /* video.mp4 in Resources */,
 				0EC5D4C21B4C46E50092ACC1 /* photo7t.jpg in Resources */,
 				0EC5D4C01B4C46E50092ACC1 /* photo6t.jpg in Resources */,
 				0EC5D4C11B4C46E50092ACC1 /* photo7.jpg in Resources */,
 				0EC5D4B61B4C46E50092ACC1 /* photo1t.jpg in Resources */,
-				0EC5D4C91B4C480E0092ACC1 /* video_thumb.jpg in Resources */,
 				0EC5D4BC1B4C46E50092ACC1 /* photo4t.jpg in Resources */,
 				0EC5D4BA1B4C46E50092ACC1 /* photo3t.jpg in Resources */,
 				0EC5D4B91B4C46E50092ACC1 /* photo3.jpg in Resources */,

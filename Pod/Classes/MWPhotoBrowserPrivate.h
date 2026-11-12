@@ -7,20 +7,12 @@
 //
 
 #import <UIKit/UIKit.h>
-// MediaPlayer 框架（MPMoviePlayerViewController，iOS 9 废弃）已移除，
-// 现代播放器 AVPlayerViewController 位于 AVKit，在 .m 中导入
-#import "MWGridViewController.h"
-#import "MWZoomingScrollView.h"
-#import "MWToolBar.h"
-
-@class AVPlayerViewController;
 @class MWPhotoInteractiveTransition;
 @class MWPhotoTransitionAnimator;
 
 // Declare private methods of browser
-// 遵循 UIAdaptivePresentationControllerDelegate 以监听用户手动关闭播放器；
 // 遵循 UIViewControllerTransitioningDelegate 以提供自定义丝滑转场
-@interface MWPhotoBrowser () <UIAdaptivePresentationControllerDelegate, UIViewControllerTransitioningDelegate> {
+@interface MWPhotoBrowser () <UIViewControllerTransitioningDelegate> {
     
 	// Data
     NSUInteger _photoCount;
@@ -59,11 +51,6 @@
     UIImage *_previousNavigationBarBackgroundImageDefault;
     // _previousNavigationBarBackgroundImageLandscapePhone 已移除：iOS 8 后横屏使用统一 metrics
 
-    // Video
-    // 类型由 MPMoviePlayerViewController 替换为 AVPlayerViewController（AVKit）
-    AVPlayerViewController *_currentVideoPlayerViewController;
-    NSUInteger _currentVideoIndex;
-    UIActivityIndicatorView *_currentVideoLoadingIndicator;
     
     // Misc
     BOOL _hasBelongedToViewController;

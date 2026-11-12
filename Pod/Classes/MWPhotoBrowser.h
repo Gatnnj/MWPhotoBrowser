@@ -63,7 +63,6 @@
 // 并把包装用导航控制器的 transitioningDelegate 指向本浏览器
 @property (nonatomic) BOOL enableCustomTransition;
 @property (nonatomic) BOOL startOnGrid;
-@property (nonatomic) BOOL autoPlayOnAppear;
 @property (nonatomic) NSUInteger delayToHideElements;
 @property (nonatomic, readonly) NSUInteger currentIndex;
 

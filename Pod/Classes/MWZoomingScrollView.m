@@ -96,15 +96,11 @@
     self.photo = nil;
     self.captionView = nil;
     self.selectedButton = nil;
-    self.playButton = nil;
     _photoImageView.hidden = NO;
     _photoImageView.image = nil;
     _index = NSUIntegerMax;
 }
 
-- (BOOL)displayingVideo {
-    return [_photo respondsToSelector:@selector(isVideo)] && _photo.isVideo;
-}
 
 - (void)setImageHidden:(BOOL)hidden {
     _photoImageView.hidden = hidden;
@@ -331,11 +327,6 @@
     // Disable scrolling initially until the first pinch to fix issues with swiping on an initally zoomed in photo
     self.scrollEnabled = NO;
     
-    // If it's a video then disable zooming
-    if ([self displayingVideo]) {
-        self.maximumZoomScale = self.zoomScale;
-        self.minimumZoomScale = self.zoomScale;
-    }
 
     // Layout
 	[self setNeedsLayout];
@@ -438,10 +429,6 @@
 
 - (void)handleDoubleTap:(CGPoint)touchPoint {
     
-    // Dont double tap to zoom if showing a video
-    if ([self displayingVideo]) {
-        return;
-    }
 	
 	// 取消排队中的单击切换显隐（双击缩放后不应再闪一次工具栏）
 	[_photoBrowser cancelPendingTapToggle];

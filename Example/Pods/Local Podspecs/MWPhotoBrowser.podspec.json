@@ -1,16 +1,16 @@
 {
   "name": "MWPhotoBrowser",
-  "version": "2.1.2",
+  "version": "3.0.0",
   "license": "MIT",
-  "summary": "A simple iOS photo and video browser with optional grid view, captions and selections.",
-  "description": "MWPhotoBrowser can display one or more images or videos by providing either UIImage\nobjects, PHAsset objects, or URLs to library assets, web images/videos or local files.\nThe photo browser handles the downloading and caching of photos from the web seamlessly.\nPhotos can be zoomed and panned, and optional (customisable) captions can be displayed.",
+  "summary": "A simple iOS photo browser with optional grid view, captions and selections.",
+  "description": "MWPhotoBrowser can display one or more images by providing UIImage objects,\nPHAsset objects, or URLs to library assets, web images or local files.\nThe photo browser handles the downloading and caching of photos from the web seamlessly.\nPhotos can be zoomed and panned, and optional (customisable) captions can be displayed.",
   "homepage": "https://github.com/Gatnnj/MWPhotoBrowser.git",
   "authors": {
     "Gatnnj": "gatnnj880@gmail.com"
   },
   "source": {
     "git": "https://github.com/Gatnnj/MWPhotoBrowser.git",
-    "tag": "2.1.2"
+    "tag": ""
   },
   "platforms": {
     "ios": "13.0"
