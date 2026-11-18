@@ -27,7 +27,6 @@
 
 - (id)initWithCoder:(NSCoder *)aDecoder {
     if ((self = [super initWithCoder:aDecoder])) {
-		self.navigationItem.title = @"MWPhotoBrowser";
         
         // Clear cache for testing
 //        [[SDImageCache sharedImageCache] clearDisk];
@@ -60,6 +59,7 @@
     // Test toolbar hiding
 //    [self setToolbarItems: @[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:nil action:nil]]];
 //    [[self navigationController] setToolbarHidden:NO animated:NO];
+    self.navigationItem.title = @"MWPhotoBrowser";
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -1183,7 +1183,8 @@
     // 3. 创建浏览器并启用自定义转场
     MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
     browser.enableCustomTransition = YES;
-    browser.enableGrid = NO;
+    browser.enableGrid = YES;
+    browser.startOnGrid = NO;
     [browser setCurrentPhotoIndex:0];
 
     // 4. 使用 OverFullScreen 保留底层列表，拖拽时才能透出背景

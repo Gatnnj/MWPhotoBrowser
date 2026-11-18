@@ -85,6 +85,9 @@
 		931651DA3099858200AAAF3F /* JXZoomImageCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651CA3099858200AAAF3F /* JXZoomImageCell.swift */; };
 		931651DB3099858200AAAF3F /* JXPhotoBrowserOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C43099858200AAAF3F /* JXPhotoBrowserOverlay.swift */; };
 		931651DC3099858200AAAF3F /* JXPhotoBrowserPaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C53099858200AAAF3F /* JXPhotoBrowserPaging.swift */; };
+		9316524030AD57FF00AAAF3F /* MWWaterfallLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 9316523D30AD57FF00AAAF3F /* MWWaterfallLayout.m */; };
+		9316524130AD57FF00AAAF3F /* MWRootTabBarController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9316523B30AD57FF00AAAF3F /* MWRootTabBarController.m */; };
+		9316524230AD57FF00AAAF3F /* MWWaterfallViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9316523F30AD57FF00AAAF3F /* MWWaterfallViewController.m */; };
 		E63C7043C7821FF6AF529694 /* libPods-MWPhotoBrowser_Example.a in Frameworks */ = {isa = PBXBuildFile; fileRef = AB6E0C4626651E0B8E71AD86 /* libPods-MWPhotoBrowser_Example.a */; };
 /* End PBXBuildFile section */
 
@@ -232,6 +235,12 @@
 		931651C93099858200AAAF3F /* JXZoomDismissAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXZoomDismissAnimator.swift; sourceTree = "<group>"; };
 		931651CA3099858200AAAF3F /* JXZoomImageCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXZoomImageCell.swift; sourceTree = "<group>"; };
 		931651CB3099858200AAAF3F /* JXZoomPresentAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXZoomPresentAnimator.swift; sourceTree = "<group>"; };
+		9316523A30AD57FF00AAAF3F /* MWRootTabBarController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MWRootTabBarController.h; sourceTree = "<group>"; };
+		9316523B30AD57FF00AAAF3F /* MWRootTabBarController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MWRootTabBarController.m; sourceTree = "<group>"; };
+		9316523C30AD57FF00AAAF3F /* MWWaterfallLayout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MWWaterfallLayout.h; sourceTree = "<group>"; };
+		9316523D30AD57FF00AAAF3F /* MWWaterfallLayout.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MWWaterfallLayout.m; sourceTree = "<group>"; };
+		9316523E30AD57FF00AAAF3F /* MWWaterfallViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MWWaterfallViewController.h; sourceTree = "<group>"; };
+		9316523F30AD57FF00AAAF3F /* MWWaterfallViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MWWaterfallViewController.m; sourceTree = "<group>"; };
 		935842F52C06D69500C9BC13 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		935842F62C06D69500C9BC13 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		AB6E0C4626651E0B8E71AD86 /* libPods-MWPhotoBrowser_Example.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-MWPhotoBrowser_Example.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -330,10 +339,16 @@
 			children = (
 				4C18E1171B47E72800E3D63A /* AppDelegate.h */,
 				4C18E1181B47E72800E3D63A /* AppDelegate.m */,
+				9316523A30AD57FF00AAAF3F /* MWRootTabBarController.h */,
+				9316523B30AD57FF00AAAF3F /* MWRootTabBarController.m */,
 				931651CD3099858200AAAF3F /* JXPhotoBrowser */,
 				9316519C3098864200AAAF3F /* YBImageBrowser */,
 				4C18E1191B47E72800E3D63A /* Menu.h */,
 				4C18E11A1B47E72800E3D63A /* Menu.m */,
+				9316523C30AD57FF00AAAF3F /* MWWaterfallLayout.h */,
+				9316523D30AD57FF00AAAF3F /* MWWaterfallLayout.m */,
+				9316523E30AD57FF00AAAF3F /* MWWaterfallViewController.h */,
+				9316523F30AD57FF00AAAF3F /* MWWaterfallViewController.m */,
 				873B8AEA1B1F5CCA007FD442 /* Main.storyboard */,
 				6003F5A8195388D20070C39A /* Images.xcassets */,
 				4C18E1431B47F05900E3D63A /* Local Media */,
@@ -699,9 +714,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -716,9 +735,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Example/Pods-MWPhotoBrowser_Example-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Example/Pods-MWPhotoBrowser_Example-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -782,6 +805,9 @@
 				931651D43099858200AAAF3F /* JXPhotoBrowserDelegate.swift in Sources */,
 				931651D53099858200AAAF3F /* JXPhotoBrowserCellProtocol.swift in Sources */,
 				931651D63099858200AAAF3F /* JXFadeAnimator.swift in Sources */,
+				9316524030AD57FF00AAAF3F /* MWWaterfallLayout.m in Sources */,
+				9316524130AD57FF00AAAF3F /* MWRootTabBarController.m in Sources */,
+				9316524230AD57FF00AAAF3F /* MWWaterfallViewController.m in Sources */,
 				931651D73099858200AAAF3F /* JXPhotoBrowserTransitionType.swift in Sources */,
 				931651D83099858200AAAF3F /* JXZoomDismissAnimator.swift in Sources */,
 				931651D93099858200AAAF3F /* JXPhotoBrowserScrollDirection.swift in Sources */,
