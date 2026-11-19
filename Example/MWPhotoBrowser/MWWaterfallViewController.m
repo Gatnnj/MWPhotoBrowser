@@ -13,6 +13,8 @@
 #import "MWPhotoBrowser.h"
 #import "MWCommon.h"
 
+#import "YBImageBrowser/YBImageBrowser.h"
+
 static NSString * const kMWWaterfallCellReuseID = @"MWWaterfallCellReuseID";
 
 #pragma mark - Cell
@@ -97,7 +99,7 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
     layout.minimumInteritemSpacing = 8.0;
     layout.minimumLineSpacing = 8.0;
     layout.sectionInset = UIEdgeInsetsMake(12.0, 12.0, 12.0, 12.0);
-
+    
     if (self = [super initWithCollectionViewLayout:layout]) {
         _waterfallLayout = layout;
         _waterfallLayout.waterfallDelegate = self;
@@ -171,12 +173,12 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-
+    
     self.navigationItem.title = @"Waterfall";
     self.collectionView.backgroundColor = [UIColor systemBackgroundColor];
     self.collectionView.alwaysBounceVertical = YES;
     [self.collectionView registerClass:[MWWaterfallCell class]
-                forCellWithReuseIdentifier:kMWWaterfallCellReuseID];
+            forCellWithReuseIdentifier:kMWWaterfallCellReuseID];
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -200,8 +202,8 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 #pragma mark - MWWaterfallLayoutDelegate
 
 - (CGFloat)waterfallLayout:(MWWaterfallLayout *)layout
- heightForItemAtIndexPath:(NSIndexPath *)indexPath
-                  itemWidth:(CGFloat)itemWidth {
+  heightForItemAtIndexPath:(NSIndexPath *)indexPath
+                 itemWidth:(CGFloat)itemWidth {
     CGFloat ratio = MWImageAspectRatioFromURLString(self.imageURLStrings[indexPath.item]);
     return itemWidth * ratio;
 }
@@ -209,13 +211,11 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 #pragma mark - UICollectionViewDelegate
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-//    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
-//        
-//    }];
+    //    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
+    //
+    //    }];
     
-    // 1. 准备本地图片数据
-    NSMutableArray *demoPhotos = [NSMutableArray array];
-//    NSArray *urls = @[@"photo1", @"photo2", @"photo2", @"photo3", @"photo4"];
+    // 数据数组
     NSArray<NSString *> *urls = @[
         @"https://picsum.photos/id/1015/3840/2560",
         @"https://picsum.photos/id/1016/3840/2560",
@@ -233,29 +233,67 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
         @"https://picsum.photos/id/1039/2560/3840",
         @"https://picsum.photos/id/1023/3000/3000",
     ];
+    
+    MWWaterfallCell *cell = (MWWaterfallCell *)[collectionView cellForItemAtIndexPath:indexPath];
+    if (cell.imageView.image == nil) {
+        return;
+    }
+    
+    if (indexPath.item % 2 == 0) {
+        [self yb_imageBrowserShowWithCoverView:cell.imageView urls:urls];
+    } else {
+        [self mw_imageBrowserShowWithCoverView:cell.imageView urls:urls];
+    }
+}
 
+#pragma mark - YBImageBrowser show
+
+- (void)yb_imageBrowserShowWithCoverView:(UIImageView *)imageView urls:(NSArray<NSString *> *)urls {
+    NSMutableArray<YBIBImageData *> *dataSourceArray = [NSMutableArray array];
+    
+    for (NSString *urlString in urls) {
+        YBIBImageData *data = [[YBIBImageData alloc] init];
+        data.interactionProfile.dismissVelocityY = 200;
+        data.imageURL = [NSURL URLWithString:urlString];
+        data.projectiveView = imageView;
+        data.allowSaveToPhotoAlbum = YES;
+        data.defaultLayout.maxZoomScale = 5;
+        
+        [dataSourceArray addObject:data];
+    }
+    
+    YBImageBrowser *browser = [[YBImageBrowser alloc] init];
+    browser.dataSourceArray = dataSourceArray; // 数据数组
+    browser.distanceBetweenPages = 8; // 分页间距
+    [browser show];
+}
+
+#pragma mark - 丝滑转场演示
+
+- (void)mw_imageBrowserShowWithCoverView:(UIImageView *)imageView urls:(NSArray<NSString *> *)urls {
+    // 1. 准备本地图片数据
+    NSMutableArray *demoPhotos = [NSMutableArray array];
     NSInteger index = 0;
     for (NSString *url in urls) {
-//        MWPhoto *p = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:url ofType:@"jpg"]] isBlur:[url isEqualToString:@"photo2"]];
+        //        MWPhoto *p = [MWPhoto photoWithURL:[NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:url ofType:@"jpg"]] isBlur:[url isEqualToString:@"photo2"]];
         MWPhoto *p = [MWPhoto photoWithURL:[NSURL URLWithString:url] isBlur:[url isEqualToString:@"https://picsum.photos/id/1016/3840/2560"]];
         p.radius = index == 1 ? 30 : 20;
         [demoPhotos addObject:p];
         index++;
     }
     self.photos = demoPhotos;
-
+    
     // 2. 在窗口左下角放一个缩略图作为连贯动画起点
     // 真实 App 中应直接传入列表 cell 上的 imageView，无需额外创建
-    MWWaterfallCell *cell = (MWWaterfallCell *)[collectionView cellForItemAtIndexPath:indexPath];
-    self.demoSourceImageView = cell.imageView;
-
+    self.demoSourceImageView = imageView;
+    
     // 3. 创建浏览器并启用自定义转场
     MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
     browser.enableCustomTransition = YES;
     browser.enableGrid = YES;
     browser.startOnGrid = NO;
     [browser setCurrentPhotoIndex:0];
-
+    
     // 4. 使用 OverFullScreen 保留底层列表，拖拽时才能透出背景
     UINavigationController *nc = [[UINavigationController alloc] initWithRootViewController:browser];
     nc.modalPresentationStyle = UIModalPresentationOverFullScreen;
@@ -264,8 +302,6 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
     nc.transitioningDelegate = browser;
     [self presentViewController:nc animated:YES completion:nil];
 }
-
-#pragma mark - 丝滑转场演示
 
 #pragma mark - MWPhotoBrowserDelegate
 

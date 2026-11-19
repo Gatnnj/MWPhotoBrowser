@@ -26,6 +26,9 @@
         return;
     }
 
+    NSUInteger previousIndex = _currentPageIndex;
+    MWZoomingScrollView *currentPage = [self pageDisplayedAtIndex:previousIndex];
+
     // Reset
     _photoCount = NSNotFound;
 
@@ -48,11 +51,35 @@
 
     // Update layout
     if ([self isViewLoaded]) {
-        while (_pagingScrollView.subviews.count) {
-            [[_pagingScrollView.subviews lastObject] removeFromSuperview];
+        BOOL canKeepCurrentPage = currentPage && numberOfPhotos > 0 && previousIndex == _currentPageIndex;
+        if (canKeepCurrentPage) {
+            _performingLayout = YES;
+            for (MWZoomingScrollView *page in [_visiblePages copy]) {
+                if (page != currentPage) {
+                    [page prepareForReuse];
+                    [page removeFromSuperview];
+                }
+            }
+            [_visiblePages removeAllObjects];
+            [_recycledPages removeAllObjects];
+            [_visiblePages addObject:currentPage];
+
+            currentPage.index = _currentPageIndex;
+            currentPage.frame = [self frameForPageAtIndex:_currentPageIndex];
+            [currentPage reloadPhotoKeepingDisplayedImage:[self photoAtIndex:_currentPageIndex]];
+
+            _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
+            _pagingScrollView.contentOffset = [self contentOffsetForPageAtIndex:_currentPageIndex];
+            [self tilePages];
+            _performingLayout = NO;
+            [self layoutVisiblePages];
+        } else {
+            while (_pagingScrollView.subviews.count) {
+                [[_pagingScrollView.subviews lastObject] removeFromSuperview];
+            }
+            [self performLayout];
+            [self.view setNeedsLayout];
         }
-        [self performLayout];
-        [self.view setNeedsLayout];
     }
 
 }
@@ -174,7 +201,8 @@
         } else {
 
             // Failed to load
-            [page displayImageFailure];
+            UIImageView *displayedImageView = (UIImageView *)[page photoImageViewForTransition];
+            if (!displayedImageView.image) [page displayImageFailure];
         }
         // Update nav
         [self updateNavigation];

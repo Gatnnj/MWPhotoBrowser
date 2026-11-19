@@ -8,6 +8,20 @@
 #import "MWPhotoBrowser.h"
 #import "MWPhotoBrowserPrivate.h"
 #import "MWPhotoTransitionAnimator.h"
+#import <QuartzCore/QuartzCore.h>
+
+static UIImage *MWTransitionSnapshot(UIView *view) {
+    if ([view isKindOfClass:UIImageView.class]) {
+        UIImage *image = ((UIImageView *)view).image;
+        if (image) return image;
+    }
+    if (!view || CGRectIsEmpty(view.bounds)) return nil;
+    UIGraphicsBeginImageContextWithOptions(view.bounds.size, NO, 0);
+    [view.layer renderInContext:UIGraphicsGetCurrentContext()];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return image;
+}
 
 @implementation MWPhotoBrowser (Transition)
 
@@ -30,12 +44,9 @@
     animator.dismissing = NO;
     UIView *startView = [self mw_startingView];
     animator.startView = startView;
-    MWZoomingScrollView *page = [self pageDisplayedAtIndex:_currentPageIndex];
-    animator.destinationImageView = [page photoImageViewForTransition];
-    // 取缩略图上的图片作为连贯移动素材，取不到则动画器内部自动降级渐隐
-    if ([startView isKindOfClass:[UIImageView class]]) {
-        animator.transitionImage = ((UIImageView *)startView).image;
-    }
+    // YBImageBrowser supports both UIImageView sources and snapshots of other
+    // projected views; use the same fallback so the coherent flight can run.
+    animator.transitionImage = MWTransitionSnapshot(startView);
     return animator;
 }
 

@@ -31,6 +31,12 @@
 
 - (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser {
     if ((self = [super init])) {
+
+        // Keep the iOS 26 scroll-edge fade from tinting the image beneath the
+        // transparent navigation bar.
+        if (@available(iOS 26.0, *)) {
+            self.topEdgeEffect.hidden = YES;
+        }
         
         // Setup
         _index = NSUIntegerMax;
@@ -104,6 +110,30 @@
     _photoImageView.hidden = hidden;
 }
 
+- (void)reloadPhotoKeepingDisplayedImage:(id<MWPhoto>)photo {
+    if (_photo != photo && [_photo respondsToSelector:@selector(cancelAnyLoading)]) {
+        [_photo cancelAnyLoading];
+    }
+    _photo = photo;
+    [self hideImageFailure];
+
+    if (!photo) {
+        _photoImageView.image = nil;
+        self.contentSize = CGSizeZero;
+        [self showLoadingIndicator];
+        return;
+    }
+
+    UIImage *image = [photo underlyingImage];
+    if (image) {
+        [self displayImage];
+    } else {
+        // Keep the old image on screen while the refreshed model loads.
+        [self hideLoadingIndicator];
+        [photo loadUnderlyingImageAndNotify];
+    }
+}
+
 #pragma mark - Image
 
 - (void)setPhoto:(id<MWPhoto>)photo {
@@ -125,43 +155,29 @@
 
 // Get and display image
 - (void)displayImage {
-	if (_photo && _photoImageView.image == nil) {
-		
-		// Reset
-		self.maximumZoomScale = 1;
-		self.minimumZoomScale = 1;
-		self.zoomScale = 1;
-		self.contentSize = CGSizeMake(0, 0);
-		
-		// Get image from browser as it handles ordering of fetching
-		UIImage *img = [_photoBrowser imageForPhoto:_photo];
-		if (img) {
-			
-			// Hide indicator
-			[self hideLoadingIndicator];
-			
-			// Set image
-			_photoImageView.image = img;
-			_photoImageView.hidden = NO;
-			
-			// Setup photo frame
-			CGRect photoImageViewFrame;
-			photoImageViewFrame.origin = CGPointZero;
-			photoImageViewFrame.size = img.size;
-			_photoImageView.frame = photoImageViewFrame;
-			self.contentSize = photoImageViewFrame.size;
+    if (!_photo) return;
 
-			// Set zoom to minimum zoom
-			[self setMaxMinZoomScalesForCurrentBounds];
-			
-		} else  {
+    // Get image or start loading. Keep an existing image visible if a refreshed
+    // photo model has not finished loading yet.
+    UIImage *img = [_photoBrowser imageForPhoto:_photo];
+    if (!img || img == _photoImageView.image) return;
 
-            // Show image failure
-            [self displayImageFailure];
-			
-		}
-		[self setNeedsLayout];
-	}
+    // Reset zoom only when the actual displayed bitmap changes.
+    self.maximumZoomScale = 1;
+    self.minimumZoomScale = 1;
+    self.zoomScale = 1;
+    self.contentSize = CGSizeMake(0, 0);
+    [self hideLoadingIndicator];
+    [self hideImageFailure];
+
+    _photoImageView.image = img;
+    _photoImageView.hidden = NO;
+
+    CGRect photoImageViewFrame = CGRectMake(0, 0, img.size.width, img.size.height);
+    _photoImageView.frame = photoImageViewFrame;
+    self.contentSize = photoImageViewFrame.size;
+    [self setMaxMinZoomScalesForCurrentBounds];
+    [self setNeedsLayout];
 }
 
 // Image failed so just show black!

@@ -22,6 +22,7 @@
     // （backgroundImage / barTintColor）会被系统默认外观的磨砂黑色渐变覆盖。
     // 这里显式配置无背景、无磨砂、无阴影的透明外观，标题保持白色。
     UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+    [appearance configureWithTransparentBackground];
     appearance.backgroundColor = [UIColor clearColor];
     appearance.backgroundImage = nil;
     appearance.backgroundEffect = nil;
@@ -30,6 +31,10 @@
     appearance.titleTextAttributes = @{ NSForegroundColorAttributeName: [UIColor whiteColor] };
     navBar.standardAppearance = appearance;
     navBar.scrollEdgeAppearance = appearance;
+    navBar.compactAppearance = appearance;
+    if (@available(iOS 15.0, *)) {
+        navBar.compactScrollEdgeAppearance = appearance;
+    }
 
     // 兼容老 API：清空背景图与阴影，背景色置透明
     [navBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
@@ -48,6 +53,10 @@
     _previousNavigationBarBackgroundImageDefault = [navBar backgroundImageForBarMetrics:UIBarMetricsDefault];
     _previousNavBarStandardAppearance = navBar.standardAppearance;
     _previousNavBarScrollEdgeAppearance = navBar.scrollEdgeAppearance;
+    _previousNavBarCompactAppearance = navBar.compactAppearance;
+    if (@available(iOS 15.0, *)) {
+        _previousNavBarCompactScrollEdgeAppearance = navBar.compactScrollEdgeAppearance;
+    }
 }
 
 - (void)restorePreviousNavBarAppearance:(BOOL)animated {
@@ -61,6 +70,10 @@
         [navBar setBackgroundImage:_previousNavigationBarBackgroundImageDefault forBarMetrics:UIBarMetricsDefault];
         if (_previousNavBarStandardAppearance) navBar.standardAppearance = _previousNavBarStandardAppearance;
         if (_previousNavBarScrollEdgeAppearance) navBar.scrollEdgeAppearance = _previousNavBarScrollEdgeAppearance;
+        navBar.compactAppearance = _previousNavBarCompactAppearance;
+        if (@available(iOS 15.0, *)) {
+            navBar.compactScrollEdgeAppearance = _previousNavBarCompactScrollEdgeAppearance;
+        }
     }
 }
 

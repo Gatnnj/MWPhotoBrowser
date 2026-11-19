@@ -8,7 +8,7 @@
 @implementation MWPhotoTransitionAnimator
 
 - (instancetype)init {
-    if ((self = [super init])) _duration = 0.32;
+    if ((self = [super init])) _duration = 0.25;
     return self;
 }
 
@@ -42,6 +42,24 @@
     return self.startView && self.startView.window && self.transitionImage && self.transitionImage.size.width > 0 && self.transitionImage.size.height > 0 && container.bounds.size.width > 0;
 }
 
+- (CGRect)mw_aspectFitFrameForImage:(UIImage *)image inBounds:(CGRect)bounds {
+    if (image.size.width <= 0 || image.size.height <= 0) return CGRectZero;
+    CGFloat scale = MIN(CGRectGetWidth(bounds) / image.size.width,
+                        CGRectGetHeight(bounds) / image.size.height);
+    CGSize size = CGSizeMake(image.size.width * scale, image.size.height * scale);
+    return CGRectMake(CGRectGetMidX(bounds) - size.width * 0.5,
+                      CGRectGetMidY(bounds) - size.height * 0.5,
+                      size.width, size.height);
+}
+
+- (UIView *)mw_blackBackdropInContainer:(UIView *)container alpha:(CGFloat)alpha {
+    UIView *backdrop = [[UIView alloc] initWithFrame:container.bounds];
+    backdrop.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    backdrop.backgroundColor = [UIColor colorWithWhite:0 alpha:alpha];
+    [container addSubview:backdrop];
+    return backdrop;
+}
+
 - (void)mw_present:(id<UIViewControllerContextTransitioning>)ctx {
     UIView *container = ctx.containerView;
     UIViewController *toVC = [ctx viewControllerForKey:UITransitionContextToViewControllerKey];
@@ -61,39 +79,28 @@
     }
 
     CGRect start = [self.startView convertRect:self.startView.bounds toView:container];
-    UIView *destination = self.destinationImageView;
-    CGRect end;
-    if (destination.window && !CGRectIsEmpty(destination.bounds)) {
-        // Match the actual image view after MWPhotoBrowser has applied its
-        // paging, safe-area and zoom layout, as Lantern does for its visible cell.
-        end = [destination convertRect:destination.bounds toView:container];
-    } else {
-        CGFloat scale = MIN(CGRectGetWidth(container.bounds) / self.transitionImage.size.width,
-                            CGRectGetHeight(container.bounds) / self.transitionImage.size.height);
-        CGSize size = CGSizeMake(self.transitionImage.size.width * scale,
-                                 self.transitionImage.size.height * scale);
-        end = CGRectMake(CGRectGetMidX(container.bounds) - size.width * 0.5,
-                         CGRectGetMidY(container.bounds) - size.height * 0.5,
-                         size.width,
-                         size.height);
-    }
+    // YBImageBrowser does not build its image cell until the opening flight
+    // finishes. Keep the presented controller hidden and animate a standalone
+    // thumbnail snapshot to the image's fitted full-screen frame first.
+    CGRect end = [self mw_aspectFitFrameForImage:self.transitionImage inBounds:container.bounds];
     UIImageView *moving = [self mw_imageViewWithImage:self.transitionImage from:self.startView];
     moving.frame = start;
+    moving.image = self.transitionImage;
     [container addSubview:moving];
     self.hiddenSourceView = self.startView;
     self.startView.hidden = YES;
-    self.hiddenDestinationView = destination;
-    destination.hidden = YES;
+    UIView *backdrop = [self mw_blackBackdropInContainer:container alpha:0];
+    [container bringSubviewToFront:moving];
     toView.alpha = 0;
-    [UIView animateWithDuration:self.duration delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+    [UIView animateWithDuration:self.duration animations:^{
         moving.frame = end;
-        toView.alpha = 1;
+        backdrop.backgroundColor = UIColor.blackColor;
     } completion:^(BOOL finished) {
         BOOL completed = !ctx.transitionWasCancelled;
         [moving removeFromSuperview];
         self.hiddenSourceView.hidden = NO;
-        self.hiddenDestinationView.hidden = NO;
         toView.alpha = 1;
+        [backdrop removeFromSuperview];
         if (!completed) [toView removeFromSuperview];
         [ctx completeTransition:completed];
     }];
@@ -118,28 +125,26 @@
 
     CGRect start = [source convertRect:source.bounds toView:container];
     CGRect end = [target convertRect:target.bounds toView:container];
+    // YBImageBrowser changes the flying image to the destination thumbnail's
+    // content mode before shrinking it back into that thumbnail.
     UIImageView *moving = [self mw_imageViewWithImage:((UIImageView *)source).image from:target];
-    // The source photo view uses .center and is enlarged by its scroll view's
-    // zoom transform. The transition view has a frame in screen coordinates,
-    // so copying .center would draw the bitmap at its unscaled pixel size.
-    // Fill the target thumbnail's actual bounds during the closing flight.
-    // A mismatched portrait photo may be cropped, but it reaches the cover's
-    // real displayed size instead of shrinking with empty side margins.
-    moving.contentMode = UIViewContentModeScaleAspectFill;
     moving.frame = start;
     [container addSubview:moving];
-    fromView.alpha = 1;
+    UIView *backdrop = [self mw_blackBackdropInContainer:container alpha:1];
+    [container bringSubviewToFront:moving];
+    fromView.alpha = 0;
     source.hidden = YES;
     target.hidden = YES;
-    [UIView animateWithDuration:self.duration delay:0 usingSpringWithDamping:0.92 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+    [UIView animateWithDuration:self.duration animations:^{
         moving.frame = end;
-        fromView.alpha = 0;
+        backdrop.backgroundColor = [UIColor colorWithWhite:0 alpha:0];
     } completion:^(BOOL finished) {
         BOOL completed = !ctx.transitionWasCancelled;
         [moving removeFromSuperview];
         source.hidden = NO;
         target.hidden = NO;
         fromView.alpha = 1;
+        [backdrop removeFromSuperview];
         [ctx completeTransition:completed];
     }];
 }

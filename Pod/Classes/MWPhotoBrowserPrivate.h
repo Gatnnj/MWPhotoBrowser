@@ -60,6 +60,8 @@
     UIImage *_previousNavigationBarBackgroundImageDefault;
     UINavigationBarAppearance *_previousNavBarStandardAppearance;
     UINavigationBarAppearance *_previousNavBarScrollEdgeAppearance;
+    UINavigationBarAppearance *_previousNavBarCompactAppearance;
+    UINavigationBarAppearance *_previousNavBarCompactScrollEdgeAppearance;
     // _previousNavigationBarBackgroundImageLandscapePhone 已移除：iOS 8 后横屏使用统一 metrics
 
     

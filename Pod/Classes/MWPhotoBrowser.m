@@ -134,6 +134,11 @@
     // 等价于旧的 self.automaticallyAdjustsScrollViewInsets = NO，
     // 明确禁止系统自动调整安全区 inset，保持现有手动布局不变
     _pagingScrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    // iOS 26 adds a scroll-edge fade beneath transparent navigation bars.
+    // The browser intentionally shows photos edge-to-edge, so suppress it.
+    if (@available(iOS 26.0, *)) {
+        _pagingScrollView.topEdgeEffect.hidden = YES;
+    }
     _pagingScrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _pagingScrollView.pagingEnabled = YES;
     _pagingScrollView.delegate = self;

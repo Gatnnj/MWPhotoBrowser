@@ -27,6 +27,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)prepareForReuse;
 - (void)setImageHidden:(BOOL)hidden;
 
+/// Rebinds refreshed photo data without clearing the currently visible image.
+- (void)reloadPhotoKeepingDisplayedImage:(nullable id<MWPhoto>)photo;
+
 // 暴露所属浏览器，供交互控制器复位时重算布局
 - (nullable MWPhotoBrowser *)photoBrowser;
 
