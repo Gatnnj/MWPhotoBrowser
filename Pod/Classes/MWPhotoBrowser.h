@@ -9,7 +9,6 @@
 #import <UIKit/UIKit.h>
 #import "MWPhoto.h"
 #import "MWPhotoProtocol.h"
-#import "MWCaptionView.h"
 
 // Debug Logging
 #if 0 // Set to 1 to enable debug logging
@@ -31,7 +30,7 @@ NS_ASSUME_NONNULL_BEGIN
 @protocol MWPhotoBrowserDelegate <NSObject>
 
 - (NSUInteger)numberOfPhotosInPhotoBrowser:(MWPhotoBrowser *)photoBrowser;
-- (id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser photoAtIndex:(NSUInteger)index;
+- (nullable id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser photoAtIndex:(NSUInteger)index;
 
 @optional
 
@@ -40,11 +39,8 @@ NS_ASSUME_NONNULL_BEGIN
 // 丝滑转场（可选）：返回该图片在列表中的缩略图视图，浏览器会从该视图位置
 // 连贯放大进入、关闭时飞回该位置；不实现则自动降级为渐隐，老调用方完全兼容
 - (nullable UIView *)photoBrowser:(MWPhotoBrowser *)photoBrowser startingViewForPhotoAtIndex:(NSUInteger)index;
-- (nullable MWCaptionView *)photoBrowser:(MWPhotoBrowser *)photoBrowser captionViewForPhotoAtIndex:(NSUInteger)index;
 - (nullable NSString *)photoBrowser:(MWPhotoBrowser *)photoBrowser titleForPhotoAtIndex:(NSUInteger)index;
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser didDisplayPhotoAtIndex:(NSUInteger)index;
-- (BOOL)photoBrowser:(MWPhotoBrowser *)photoBrowser isPhotoSelectedAtIndex:(NSUInteger)index;
-- (void)photoBrowser:(MWPhotoBrowser *)photoBrowser photoAtIndex:(NSUInteger)index selectedChanged:(BOOL)selected;
 - (void)photoBrowserDidFinishModalPresentation:(MWPhotoBrowser *)photoBrowser;
 
 @end
@@ -54,11 +50,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, weak, nullable) id<MWPhotoBrowserDelegate> delegate;
 @property (nonatomic) BOOL zoomPhotosToFill;
-@property (nonatomic) BOOL displaySelectionButtons;
 @property (nonatomic) BOOL alwaysShowControls;
 @property (nonatomic) BOOL enableGrid;
 @property (nonatomic) BOOL enableSwipeToDismiss;
 @property (nonatomic) BOOL isHiddenToolBar;
+@property (nonatomic) BOOL isShowGriding;
 
 // 是否启用自定义丝滑转场（连贯放大 + 拖拽关闭），默认 NO 保持原有行为；
 // 启用后需以 UIModalPresentationOverFullScreen 呈现（保留底层视图以支持拖拽透底），
@@ -68,20 +64,19 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) NSUInteger delayToHideElements;
 @property (nonatomic, readonly) NSUInteger currentIndex;
 
-// Customise image selection icons as they are the only icons with a colour tint
-// Icon should be located in the app's main bundle
-@property (nonatomic, strong, nullable) NSString *customImageSelectedIconName;
-@property (nonatomic, strong, nullable) NSString *customImageSelectedSmallIconName;
-
 /// Optional factory for loading indicators used by zoom pages and grid cells.
 /// Return a new configured view, or nil to use the built-in progress indicator.
 /// The returned view is centered in the supplied container and hidden when loading finishes.
 /// Custom views may implement -setProgress: to receive download progress from 0 to 1.
-@property (nonatomic, copy) UIView * _Nullable (^loadingViewProvider)(UIView *container);
+@property (nonatomic, copy, nullable) UIView * _Nullable (^loadingViewProvider)(UIView *container);
+
+/// Optional source-thumbnail provider, queried for the current page during transitions.
+/// This can be set before presentation without requiring an initialized delegate.
+@property (nonatomic, copy, nullable) UIView * _Nullable (^startingViewProvider)(NSUInteger index);
 
 // Init
-- (id)initWithPhotos:(NSArray *)photosArray;
-- (id)initWithDelegate:(id <MWPhotoBrowserDelegate>)delegate;
+- (instancetype)initWithPhotos:(NSArray<id<MWPhoto>> *)photosArray;
+- (instancetype)initWithDelegate:(id <MWPhotoBrowserDelegate>)delegate;
 
 // Reloads the photo browser and refetches data
 - (void)reloadData;
@@ -94,7 +89,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)showPreviousPhotoAnimated:(BOOL)animated;
 
 // ToolBar
--(void)customToolBarItems:(NSArray<UIButton *> *)array;
+- (void)customToolBarItems:(NSArray<UIButton *> *)array;
 @end
 
 NS_ASSUME_NONNULL_END

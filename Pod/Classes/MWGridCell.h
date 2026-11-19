@@ -17,8 +17,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, weak, nullable) MWGridViewController *gridController;
 @property (nonatomic) NSUInteger index;
 @property (nonatomic, nullable) id <MWPhoto> photo;
-@property (nonatomic) BOOL selectionMode;
-@property (nonatomic) BOOL isSelected;
 
 - (void)displayImage;
 

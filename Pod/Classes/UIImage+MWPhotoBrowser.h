@@ -31,9 +31,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// 压缩图片
 + (nullable NSData *)mwCompressImage:(UIImage *)image;
 
-/// 生成适合浏览展示的 JPEG 缩略图：最长边不超过 1280 像素，目标文件大小约 300 KB。
-+ (nullable NSData *)mwCompressImageForThumbnail:(UIImage *)image;
-
 /// @maskName 水印名
 + (nullable NSData *)mwCompressImage:(UIImage *)image withMask:(nullable NSString *)maskName;
 

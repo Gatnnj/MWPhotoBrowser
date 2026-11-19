@@ -29,7 +29,7 @@
 
 @implementation MWZoomingScrollView
 
-- (id)initWithPhotoBrowser:(MWPhotoBrowser *)browser {
+- (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser {
     if ((self = [super init])) {
         
         // Setup
@@ -94,8 +94,6 @@
 - (void)prepareForReuse {
     [self hideImageFailure];
     self.photo = nil;
-    self.captionView = nil;
-    self.selectedButton = nil;
     _photoImageView.hidden = NO;
     _photoImageView.image = nil;
     _index = NSUIntegerMax;

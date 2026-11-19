@@ -209,9 +209,9 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 #pragma mark - UICollectionViewDelegate
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
-        
-    }];
+//    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
+//        
+//    }];
     
     // 1. 准备本地图片数据
     NSMutableArray *demoPhotos = [NSMutableArray array];

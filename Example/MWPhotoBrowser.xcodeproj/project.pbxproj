@@ -71,20 +71,6 @@
 		931651BB3098864200AAAF3F /* YBIBAnimatedTransition.m in Sources */ = {isa = PBXBuildFile; fileRef = 931651513098864200AAAF3F /* YBIBAnimatedTransition.m */; };
 		931651BC3098864200AAAF3F /* YBIBCollectionViewLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 931651553098864200AAAF3F /* YBIBCollectionViewLayout.m */; };
 		931651BD3098864200AAAF3F /* YBImageBrowser.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 9316519A3098864200AAAF3F /* YBImageBrowser.bundle */; };
-		931651CF3099858200AAAF3F /* JXImageCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651BF3099858200AAAF3F /* JXImageCell.swift */; };
-		931651D03099858200AAAF3F /* JXPhotoBrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C83099858200AAAF3F /* JXPhotoBrowserViewController.swift */; };
-		931651D13099858200AAAF3F /* JXNoneAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C03099858200AAAF3F /* JXNoneAnimator.swift */; };
-		931651D23099858200AAAF3F /* JXZoomPresentAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651CB3099858200AAAF3F /* JXZoomPresentAnimator.swift */; };
-		931651D33099858200AAAF3F /* JXPageIndicatorOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C13099858200AAAF3F /* JXPageIndicatorOverlay.swift */; };
-		931651D43099858200AAAF3F /* JXPhotoBrowserDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C33099858200AAAF3F /* JXPhotoBrowserDelegate.swift */; };
-		931651D53099858200AAAF3F /* JXPhotoBrowserCellProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C23099858200AAAF3F /* JXPhotoBrowserCellProtocol.swift */; };
-		931651D63099858200AAAF3F /* JXFadeAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651BE3099858200AAAF3F /* JXFadeAnimator.swift */; };
-		931651D73099858200AAAF3F /* JXPhotoBrowserTransitionType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C73099858200AAAF3F /* JXPhotoBrowserTransitionType.swift */; };
-		931651D83099858200AAAF3F /* JXZoomDismissAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C93099858200AAAF3F /* JXZoomDismissAnimator.swift */; };
-		931651D93099858200AAAF3F /* JXPhotoBrowserScrollDirection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C63099858200AAAF3F /* JXPhotoBrowserScrollDirection.swift */; };
-		931651DA3099858200AAAF3F /* JXZoomImageCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651CA3099858200AAAF3F /* JXZoomImageCell.swift */; };
-		931651DB3099858200AAAF3F /* JXPhotoBrowserOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C43099858200AAAF3F /* JXPhotoBrowserOverlay.swift */; };
-		931651DC3099858200AAAF3F /* JXPhotoBrowserPaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931651C53099858200AAAF3F /* JXPhotoBrowserPaging.swift */; };
 		9316524030AD57FF00AAAF3F /* MWWaterfallLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 9316523D30AD57FF00AAAF3F /* MWWaterfallLayout.m */; };
 		9316524130AD57FF00AAAF3F /* MWRootTabBarController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9316523B30AD57FF00AAAF3F /* MWRootTabBarController.m */; };
 		9316524230AD57FF00AAAF3F /* MWWaterfallViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9316523F30AD57FF00AAAF3F /* MWWaterfallViewController.m */; };
@@ -221,20 +207,6 @@
 		931651993098864200AAAF3F /* YBImageBrowser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = YBImageBrowser.h; sourceTree = "<group>"; };
 		9316519A3098864200AAAF3F /* YBImageBrowser.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = YBImageBrowser.bundle; sourceTree = "<group>"; };
 		9316519B3098864200AAAF3F /* YBImageBrowser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = YBImageBrowser.m; sourceTree = "<group>"; };
-		931651BE3099858200AAAF3F /* JXFadeAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXFadeAnimator.swift; sourceTree = "<group>"; };
-		931651BF3099858200AAAF3F /* JXImageCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXImageCell.swift; sourceTree = "<group>"; };
-		931651C03099858200AAAF3F /* JXNoneAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXNoneAnimator.swift; sourceTree = "<group>"; };
-		931651C13099858200AAAF3F /* JXPageIndicatorOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPageIndicatorOverlay.swift; sourceTree = "<group>"; };
-		931651C23099858200AAAF3F /* JXPhotoBrowserCellProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPhotoBrowserCellProtocol.swift; sourceTree = "<group>"; };
-		931651C33099858200AAAF3F /* JXPhotoBrowserDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPhotoBrowserDelegate.swift; sourceTree = "<group>"; };
-		931651C43099858200AAAF3F /* JXPhotoBrowserOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPhotoBrowserOverlay.swift; sourceTree = "<group>"; };
-		931651C53099858200AAAF3F /* JXPhotoBrowserPaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPhotoBrowserPaging.swift; sourceTree = "<group>"; };
-		931651C63099858200AAAF3F /* JXPhotoBrowserScrollDirection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPhotoBrowserScrollDirection.swift; sourceTree = "<group>"; };
-		931651C73099858200AAAF3F /* JXPhotoBrowserTransitionType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPhotoBrowserTransitionType.swift; sourceTree = "<group>"; };
-		931651C83099858200AAAF3F /* JXPhotoBrowserViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXPhotoBrowserViewController.swift; sourceTree = "<group>"; };
-		931651C93099858200AAAF3F /* JXZoomDismissAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXZoomDismissAnimator.swift; sourceTree = "<group>"; };
-		931651CA3099858200AAAF3F /* JXZoomImageCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXZoomImageCell.swift; sourceTree = "<group>"; };
-		931651CB3099858200AAAF3F /* JXZoomPresentAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JXZoomPresentAnimator.swift; sourceTree = "<group>"; };
 		9316523A30AD57FF00AAAF3F /* MWRootTabBarController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MWRootTabBarController.h; sourceTree = "<group>"; };
 		9316523B30AD57FF00AAAF3F /* MWRootTabBarController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MWRootTabBarController.m; sourceTree = "<group>"; };
 		9316523C30AD57FF00AAAF3F /* MWWaterfallLayout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MWWaterfallLayout.h; sourceTree = "<group>"; };
@@ -341,7 +313,6 @@
 				4C18E1181B47E72800E3D63A /* AppDelegate.m */,
 				9316523A30AD57FF00AAAF3F /* MWRootTabBarController.h */,
 				9316523B30AD57FF00AAAF3F /* MWRootTabBarController.m */,
-				931651CD3099858200AAAF3F /* JXPhotoBrowser */,
 				9316519C3098864200AAAF3F /* YBImageBrowser */,
 				4C18E1191B47E72800E3D63A /* Menu.h */,
 				4C18E11A1B47E72800E3D63A /* Menu.m */,
@@ -534,27 +505,6 @@
 				931651983098864200AAAF3F /* YYImage */,
 			);
 			path = YBImageBrowser;
-			sourceTree = "<group>";
-		};
-		931651CD3099858200AAAF3F /* JXPhotoBrowser */ = {
-			isa = PBXGroup;
-			children = (
-				931651BE3099858200AAAF3F /* JXFadeAnimator.swift */,
-				931651BF3099858200AAAF3F /* JXImageCell.swift */,
-				931651C03099858200AAAF3F /* JXNoneAnimator.swift */,
-				931651C13099858200AAAF3F /* JXPageIndicatorOverlay.swift */,
-				931651C23099858200AAAF3F /* JXPhotoBrowserCellProtocol.swift */,
-				931651C33099858200AAAF3F /* JXPhotoBrowserDelegate.swift */,
-				931651C43099858200AAAF3F /* JXPhotoBrowserOverlay.swift */,
-				931651C53099858200AAAF3F /* JXPhotoBrowserPaging.swift */,
-				931651C63099858200AAAF3F /* JXPhotoBrowserScrollDirection.swift */,
-				931651C73099858200AAAF3F /* JXPhotoBrowserTransitionType.swift */,
-				931651C83099858200AAAF3F /* JXPhotoBrowserViewController.swift */,
-				931651C93099858200AAAF3F /* JXZoomDismissAnimator.swift */,
-				931651CA3099858200AAAF3F /* JXZoomImageCell.swift */,
-				931651CB3099858200AAAF3F /* JXZoomPresentAnimator.swift */,
-			);
-			path = JXPhotoBrowser;
 			sourceTree = "<group>";
 		};
 		D9F42B3C389641D25FBC9C64 /* Pods */ = {
@@ -797,23 +747,9 @@
 				931651AC3098864200AAAF3F /* YYAnimatedImageView.m in Sources */,
 				931651AD3098864200AAAF3F /* YBIBUtilities.m in Sources */,
 				931651AE3098864200AAAF3F /* YBIBImageScrollView.m in Sources */,
-				931651CF3099858200AAAF3F /* JXImageCell.swift in Sources */,
-				931651D03099858200AAAF3F /* JXPhotoBrowserViewController.swift in Sources */,
-				931651D13099858200AAAF3F /* JXNoneAnimator.swift in Sources */,
-				931651D23099858200AAAF3F /* JXZoomPresentAnimator.swift in Sources */,
-				931651D33099858200AAAF3F /* JXPageIndicatorOverlay.swift in Sources */,
-				931651D43099858200AAAF3F /* JXPhotoBrowserDelegate.swift in Sources */,
-				931651D53099858200AAAF3F /* JXPhotoBrowserCellProtocol.swift in Sources */,
-				931651D63099858200AAAF3F /* JXFadeAnimator.swift in Sources */,
 				9316524030AD57FF00AAAF3F /* MWWaterfallLayout.m in Sources */,
 				9316524130AD57FF00AAAF3F /* MWRootTabBarController.m in Sources */,
 				9316524230AD57FF00AAAF3F /* MWWaterfallViewController.m in Sources */,
-				931651D73099858200AAAF3F /* JXPhotoBrowserTransitionType.swift in Sources */,
-				931651D83099858200AAAF3F /* JXZoomDismissAnimator.swift in Sources */,
-				931651D93099858200AAAF3F /* JXPhotoBrowserScrollDirection.swift in Sources */,
-				931651DA3099858200AAAF3F /* JXZoomImageCell.swift in Sources */,
-				931651DB3099858200AAAF3F /* JXPhotoBrowserOverlay.swift in Sources */,
-				931651DC3099858200AAAF3F /* JXPhotoBrowserPaging.swift in Sources */,
 				931651AF3098864200AAAF3F /* YBImageBrowser.m in Sources */,
 				931651B03098864200AAAF3F /* YYImageCoder.m in Sources */,
 				931651B13098864200AAAF3F /* YBIBScreenRotationHandler.m in Sources */,

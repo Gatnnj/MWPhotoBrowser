@@ -11,20 +11,16 @@
 #import "MWTapDetectingImageView.h"
 #import "MWTapDetectingView.h"
 
-@class MWPhotoBrowser, MWPhoto, MWCaptionView;
+@class MWPhotoBrowser, MWPhoto;
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate> {
-
-}
+@interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate>
 
 @property () NSUInteger index;
 @property (nonatomic, nullable) id <MWPhoto> photo;
-@property (nonatomic, weak, nullable) MWCaptionView *captionView;
-@property (nonatomic, weak, nullable) UIButton *selectedButton;
 
-- (id)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
+- (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
 - (void)displayImage;
 - (void)displayImageFailure;
 - (void)setMaxMinZoomScalesForCurrentBounds;

@@ -62,17 +62,16 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) BOOL isBlur;
 /// Optional compressed image used by the grid view when available.
 @property (nonatomic, readonly, nullable) UIImage *gridThumbnailImage;
-@property (nonatomic) BOOL isZoom;
+/// Load a grid-sized decode from the same source URL without retaining the full decoded image.
+- (void)loadGridThumbnailAndNotifyWithPixelSize:(CGSize)pixelSize;
+/// Release the in-memory grid thumbnail when its cell leaves the visible range.
+- (void)releaseGridThumbnailFromMemory;
 // default 30.0
 @property (nonatomic) CGFloat radius;
 
 // If photo is empty, in which case, don't show loading error icons
 @property (nonatomic) BOOL emptyImage;
 
-
-// Return a caption string to be displayed over the image
-// Return nil to display no caption
-- (nullable NSString *)caption;
 
 // Cancel any background loading of image data
 - (void)cancelAnyLoading;

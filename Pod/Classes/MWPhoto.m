@@ -29,8 +29,7 @@ static dispatch_queue_t MWPhotoBlurQueue(void) {
     return queue;
 }
 
-/// 模糊图与缩放缩略图共用同一个缓存目录，便于统一统计容量与淘汰。
-/// 文件名前缀区分类型：blur_ 为模糊图（含配套 .plist 元数据），zoom_ 为缩放缩略图。
+/// 模糊图缓存目录。
 static NSString *MWPhotoImageCacheDirectory(void) {
     static NSString *directory;
     static dispatch_once_t onceToken;
@@ -76,31 +75,8 @@ static NSString *MWPhotoBlurCachePath(NSURL *url, CGFloat radius) {
     NSString *prefix = MWPhotoBlurCachePrefix(url);
     if (!prefix) return nil;
     NSString *radiusKey = [NSString stringWithFormat:@"%.3f", radius];
-    // blur_ 前缀用于与缩放缩略图区分（两者共用同一目录）
+    // blur_ 前缀用于标记生成的模糊图缓存。
     return [[MWPhotoBlurCacheDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"blur_%@_%@.jpg", prefix, radiusKey]] copy];
-}
-
-static NSString *MWPhotoZoomCacheDirectory(void) {
-    return MWPhotoImageCacheDirectory();
-}
-
-static NSString *MWPhotoZoomCachePath(NSURL *url) {
-    NSString *prefix = MWPhotoBlurCachePrefix(url);
-    return prefix ? [[MWPhotoZoomCacheDirectory() stringByAppendingPathComponent:[@"zoom_" stringByAppendingString:[prefix stringByAppendingString:@".jpg"]]] copy] : nil;
-}
-
-static UIImage *MWPhotoDecodeZoomData(NSData *data) {
-    if (!data.length) return nil;
-    CGImageSourceRef source = CGImageSourceCreateWithData((__bridge CFDataRef)data, NULL);
-    if (!source) return nil;
-    NSDictionary *options = @{(id)kCGImageSourceShouldCache: @YES,
-                              (id)kCGImageSourceShouldCacheImmediately: @YES};
-    CGImageRef cgImage = CGImageSourceCreateImageAtIndex(source, 0, (__bridge CFDictionaryRef)options);
-    CFRelease(source);
-    if (!cgImage) return nil;
-    UIImage *image = [UIImage imageWithCGImage:cgImage scale:1.0 orientation:UIImageOrientationUp];
-    CGImageRelease(cgImage);
-    return image;
 }
 
 static UIImage *MWPhotoReadBlurCache(NSString *path) {
@@ -202,8 +178,13 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 
     BOOL _loadingInProgress;
     id <SDWebImageOperation> _webImageOperation;
+    id <SDWebImageOperation> _gridWebImageOperation;
     PHImageRequestID _assetRequestID;
     NSUInteger _loadGeneration;
+    NSUInteger _gridLoadGeneration;
+    CGSize _gridThumbnailPixelSize;
+    BOOL _gridThumbnailLoading;
+    BOOL _gridThumbnailDemanded;
         
 }
 
@@ -216,8 +197,8 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 - (void)imageLoadingComplete;
 - (void)completeLoadingWithImage:(UIImage *)image generation:(NSUInteger)generation;
 - (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation;
-- (void)processGridThumbnailFromImage:(UIImage *)image generation:(NSUInteger)generation completion:(void (^)(void))completion;
 - (void)finishLoadingSourceImage:(UIImage *)image generation:(NSUInteger)generation;
+- (void)removeSDWebImageMemoryCacheEntries;
 
 @end
 
@@ -237,8 +218,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 
 + (void)clearBlurCacheWithCompletion:(void (^)(void))completion {
     dispatch_async(MWPhotoBlurQueue(), ^{
-        // 与缩放缩略图共用同一目录，这里只清理模糊图相关文件（blur_ 前缀，
-        // 含配套的 .plist），不能整目录删除
+        // 只清理模糊图相关文件（blur_ 前缀，含配套的 .plist）。
         NSString *directory = MWPhotoImageCacheDirectory();
         NSFileManager *fileManager = [NSFileManager defaultManager];
         for (NSString *fileName in [fileManager contentsOfDirectoryAtPath:directory error:nil]) {
@@ -269,53 +249,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     });
 }
 
-+ (void)clearZoomCache {
-    [self clearZoomCacheWithCompletion:nil];
-}
-
-+ (void)clearZoomCacheWithCompletion:(void (^)(void))completion {
-    dispatch_async(MWPhotoBlurQueue(), ^{
-        // 与模糊图共用同一目录，这里只清理缩放缩略图（zoom_ 前缀）
-        NSString *directory = MWPhotoImageCacheDirectory();
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        for (NSString *fileName in [fileManager contentsOfDirectoryAtPath:directory error:nil]) {
-            if ([fileName hasPrefix:@"zoom_"]) {
-                [fileManager removeItemAtPath:[directory stringByAppendingPathComponent:fileName] error:nil];
-            }
-        }
-        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
-    });
-}
-
-+ (void)clearZoomCacheForURL:(NSURL *)url {
-    [self clearZoomCacheForURL:url completion:nil];
-}
-
-+ (void)clearZoomCacheForURL:(NSURL *)url completion:(void (^)(void))completion {
-    NSString *path = MWPhotoZoomCachePath(url);
-    if (!path) {
-        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
-        return;
-    }
-    dispatch_async(MWPhotoBlurQueue(), ^{
-        [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
-        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
-    });
-}
-
-+ (void)clearBlurAndZoomCache {
-    [self clearBlurAndZoomCacheWithCompletion:nil];
-}
-
-+ (void)clearBlurAndZoomCacheWithCompletion:(void (^)(void))completion {
-    dispatch_async(MWPhotoBlurQueue(), ^{
-        // 两类缓存现已共用一个目录，整目录删除即可
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        [fileManager removeItemAtPath:MWPhotoImageCacheDirectory() error:nil];
-        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
-    });
-}
-
 + (MWPhoto *)photoWithImage:(UIImage *)image {
 	return [[MWPhoto alloc] initWithImage:image];
 }
@@ -335,7 +268,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 
 #pragma mark - Init
 
-- (id)init {
+- (instancetype)init {
     if ((self = [super init])) {
         self.emptyImage = YES;
         [self setup];
@@ -343,7 +276,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     return self;
 }
 
-- (id)initWithImage:(UIImage *)image {
+- (instancetype)initWithImage:(UIImage *)image {
     if ((self = [super init])) {
         self.image = image;
         [self setup];
@@ -351,7 +284,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     return self;
 }
 
-- (id)initWithURL:(NSURL *)url {
+- (instancetype)initWithURL:(NSURL *)url {
     if ((self = [super init])) {
         self.photoURL = url;
         [self setup];
@@ -359,7 +292,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     return self;
 }
 
-- (id)initWithURL:(NSURL *)url isBlur:(BOOL)isBlur {
+- (instancetype)initWithURL:(NSURL *)url isBlur:(BOOL)isBlur {
     if ((self = [super init])) {
         self.photoURL = url;
         self.isBlur = isBlur;
@@ -369,7 +302,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     return self;
 }
 
-- (id)initWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize {
+- (instancetype)initWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize {
     if ((self = [super init])) {
         self.asset = asset;
         self.assetTargetSize = targetSize;
@@ -401,6 +334,12 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
     if (_isBlur == isBlur) return;
     _isBlur = isBlur;
+    self.gridThumbnailImage = nil;
+    _gridThumbnailPixelSize = CGSizeZero;
+    _gridLoadGeneration++;
+    _gridThumbnailLoading = NO;
+    [_gridWebImageOperation cancel];
+    _gridWebImageOperation = nil;
 
     // A source image is retained while loaded, so entitlement changes can switch
     // between the original and blurred rendering without replacing the URL/model.
@@ -432,31 +371,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
-- (void)setIsZoom:(BOOL)isZoom {
-    if (![NSThread isMainThread]) {
-        dispatch_async(dispatch_get_main_queue(), ^{ self.isZoom = isZoom; });
-        return;
-    }
-    if (_isZoom == isZoom) return;
-    _isZoom = isZoom;
-    if (!isZoom) {
-        self.gridThumbnailImage = nil;
-        UIImage *source = self.sourceImage ?: self.underlyingImage;
-        if (_loadingInProgress && source) {
-            NSUInteger generation = ++_loadGeneration;
-            [self finishLoadingSourceImage:source generation:generation];
-        }
-        return;
-    }
-    UIImage *source = self.sourceImage ?: self.underlyingImage;
-    if (!source) return; // The active image request will create the thumbnail on completion.
-    NSUInteger generation = ++_loadGeneration;
-    _loadingInProgress = YES;
-    [self processGridThumbnailFromImage:source generation:generation completion:^{
-        [self finishLoadingSourceImage:source generation:generation];
-    }];
-}
-
 - (void)loadUnderlyingImageAndNotify {
     NSAssert([[NSThread currentThread] isMainThread], @"This method must be called on the main thread.");
     if (_loadingInProgress) return;
@@ -476,6 +390,79 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
     @finally {
     }
+}
+
+- (void)loadGridThumbnailAndNotifyWithPixelSize:(CGSize)pixelSize {
+    NSAssert([[NSThread currentThread] isMainThread], @"This method must be called on the main thread.");
+    pixelSize = CGSizeMake(MAX(1, ceil(pixelSize.width)), MAX(1, ceil(pixelSize.height)));
+    _gridThumbnailDemanded = YES;
+
+    if (self.gridThumbnailImage &&
+        _gridThumbnailPixelSize.width >= pixelSize.width &&
+        _gridThumbnailPixelSize.height >= pixelSize.height) {
+        [self postCompleteNotification];
+        return;
+    }
+    if (_gridThumbnailLoading) return;
+
+    if (!_photoURL) {
+        // Non-URL sources keep the legacy loading behavior. The community
+        // gallery's single-large-URL path takes the downsampled request below.
+        [self loadUnderlyingImageAndNotify];
+        return;
+    }
+
+    _gridThumbnailLoading = YES;
+    NSUInteger generation = ++_gridLoadGeneration;
+    _gridThumbnailPixelSize = pixelSize;
+    SDWebImageContext *context = @{
+        SDWebImageContextImageThumbnailPixelSize: [NSValue valueWithCGSize:pixelSize],
+        // Keep the decoded thumbnail out of SDWebImage's memory cache; retain
+        // the compressed original and thumbnail variants on disk for reuse.
+        SDWebImageContextStoreCacheType: @(SDImageCacheTypeDisk)
+    };
+    __weak typeof(self) weakSelf = self;
+    _gridWebImageOperation = [[SDWebImageManager sharedManager] loadImageWithURL:_photoURL
+                                                                           options:0
+                                                                          context:context
+                                                                         progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
+        MWPhoto *photo = weakSelf;
+        if (!photo || expectedSize <= 0) return;
+        float progress = receivedSize / (float)expectedSize;
+        NSDictionary *info = @{@"progress": @(progress), @"photo": photo};
+        [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:info];
+    } completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
+        if (!finished) return;
+        MWPhoto *photo = weakSelf;
+        if (!photo || generation != photo->_gridLoadGeneration) return;
+        photo->_gridWebImageOperation = nil;
+
+        void (^finish)(UIImage *) = ^(UIImage *gridImage) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (generation != photo->_gridLoadGeneration) return;
+                photo->_gridThumbnailLoading = NO;
+                if (photo->_gridThumbnailDemanded) {
+                    photo.gridThumbnailImage = gridImage;
+                    [photo postCompleteNotification];
+                }
+            });
+        };
+        if (image && photo.isBlur) {
+            CGFloat blurRadius = MAX(2, MIN(photo.radius, MAX(pixelSize.width, pixelSize.height) / 16.0));
+            dispatch_async(MWPhotoBlurQueue(), ^{
+                @autoreleasepool {
+                    finish([UIImage gaussianBlurWithImage:image ofRadius:blurRadius] ?: image);
+                }
+            });
+        } else {
+            finish(image);
+        }
+    }];
+}
+
+- (void)releaseGridThumbnailFromMemory {
+    _gridThumbnailDemanded = NO;
+    self.gridThumbnailImage = nil;
 }
 
 // Set the underlyingImage
@@ -648,13 +635,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (generation != self->_loadGeneration) return;
         self.sourceImage = image;
-        if (image && self.isZoom) {
-            [self processGridThumbnailFromImage:image generation:generation completion:^{
-                [self finishLoadingSourceImage:image generation:generation];
-            }];
-        } else {
-            [self finishLoadingSourceImage:image generation:generation];
-        }
+        [self finishLoadingSourceImage:image generation:generation];
     });
 }
 
@@ -666,33 +647,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     } else {
         [self processSourceImage:image generation:generation];
     }
-}
-
-- (void)processGridThumbnailFromImage:(UIImage *)image generation:(NSUInteger)generation completion:(void (^)(void))completion {
-    NSString *cachePath = MWPhotoZoomCachePath(self.photoURL);
-    dispatch_async(MWPhotoBlurQueue(), ^{
-        @autoreleasepool {
-            UIImage *thumbnail = cachePath ? MWPhotoDecodeZoomData([NSData dataWithContentsOfFile:cachePath]) : nil;
-            if (!thumbnail) {
-                NSData *data = [UIImage mwCompressImageForThumbnail:image];
-                if (data) {
-                    thumbnail = MWPhotoDecodeZoomData(data);
-                    if (cachePath && thumbnail) {
-                        NSString *directory = [cachePath stringByDeletingLastPathComponent];
-                        [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
-                        [data writeToFile:cachePath options:NSDataWritingAtomic error:nil];
-                        // 写入后检查总容量，超限时淘汰最旧的文件
-                        MWPhotoEnforceImageCacheLimitIfNeeded();
-                    }
-                }
-            }
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (generation != self->_loadGeneration || !self.isZoom) return;
-                self.gridThumbnailImage = thumbnail;
-                if (completion) completion();
-            });
-        }
-    });
 }
 
 - (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation {
@@ -717,9 +671,31 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 // Release if we can get it again from path or url
 - (void)unloadUnderlyingImage {
 	[self cancelAnyLoading];
+	[self removeSDWebImageMemoryCacheEntries];
 	self.sourceImage = nil;
 	self.gridThumbnailImage = nil;
 	self.underlyingImage = nil;
+}
+
+- (void)removeSDWebImageMemoryCacheEntries {
+    if (!_photoURL) return;
+
+    SDWebImageManager *manager = [SDWebImageManager sharedManager];
+    id<SDImageCache> imageCache = manager.imageCache;
+    NSString *originalKey = [manager cacheKeyForURL:_photoURL context:nil];
+    if (originalKey.length) {
+        [imageCache removeImageForKey:originalKey cacheType:SDImageCacheTypeMemory completion:nil];
+    }
+
+    if (_gridThumbnailPixelSize.width > 0 && _gridThumbnailPixelSize.height > 0) {
+        SDWebImageContext *context = @{
+            SDWebImageContextImageThumbnailPixelSize: [NSValue valueWithCGSize:_gridThumbnailPixelSize]
+        };
+        NSString *thumbnailKey = [manager cacheKeyForURL:_photoURL context:context];
+        if (thumbnailKey.length) {
+            [imageCache removeImageForKey:thumbnailKey cacheType:SDImageCacheTypeMemory completion:nil];
+        }
+    }
 }
 
 - (void)imageLoadingComplete {
@@ -746,6 +722,13 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
         _loadingInProgress = NO;
     }
     [self cancelImageRequest];
+    _gridLoadGeneration++;
+    _gridThumbnailLoading = NO;
+    _gridThumbnailDemanded = NO;
+    if (_gridWebImageOperation != nil) {
+        [_gridWebImageOperation cancel];
+        _gridWebImageOperation = nil;
+    }
 }
 
 - (void)cancelImageRequest {

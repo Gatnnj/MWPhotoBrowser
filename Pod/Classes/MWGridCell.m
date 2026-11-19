@@ -18,7 +18,6 @@
     UIImageView *_imageView;
     UIImageView *_loadingError;
 	UIView *_loadingIndicator;
-    UIButton *_selectedButton;
     
 }
 
@@ -41,17 +40,6 @@
         [self addSubview:_imageView];
         
         
-        // Selection button
-        _selectedButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        _selectedButton.contentMode = UIViewContentModeTopRight;
-        // adjustsImageWhenHighlighted（iOS 15 废弃）已移除：该属性默认值即为 NO，删除后行为完全等价
-        [_selectedButton setImage:[UIImage mw_imageNamed:@"ImageSelectedSmallOff"] forState:UIControlStateNormal];
-        [_selectedButton setImage:[UIImage mw_imageNamed:@"ImageSelectedSmallOn"] forState:UIControlStateSelected];
-        [_selectedButton addTarget:self action:@selector(selectionButtonPressed) forControlEvents:UIControlEventTouchDown];
-        _selectedButton.hidden = YES;
-        _selectedButton.frame = CGRectMake(0, 0, 44, 44);
-        [self addSubview:_selectedButton];
-    
 		// Loading indicator
         // Listen for photo loading notifications
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -74,10 +62,6 @@
 - (void)setGridController:(MWGridViewController *)gridController {
     _gridController = gridController;
     [self ensureLoadingIndicator];
-    // Set custom selection image if required
-    if (_gridController.browser.customImageSelectedSmallIconName) {
-        [_selectedButton setImage:[UIImage imageNamed:_gridController.browser.customImageSelectedSmallIconName] forState:UIControlStateSelected];
-    }
 }
 
 - (void)ensureLoadingIndicator {
@@ -106,8 +90,6 @@
                                          floorf((self.bounds.size.height - _loadingIndicator.frame.size.height) / 2),
                                          _loadingIndicator.frame.size.width,
                                          _loadingIndicator.frame.size.height);
-    _selectedButton.frame = CGRectMake(self.bounds.size.width - _selectedButton.frame.size.width - 0,
-                                       0, _selectedButton.frame.size.width, _selectedButton.frame.size.height);
 }
 
 #pragma mark - Cell
@@ -119,7 +101,6 @@
     if ([_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
         [(id<MWPhotoBrowserLoadingView>)_loadingIndicator setProgress:0];
     }
-    _selectedButton.hidden = YES;
     [self hideImageFailure];
     [super prepareForReuse];
 }
@@ -130,10 +111,11 @@
     [self ensureLoadingIndicator];
     _photo = photo;
     if (_photo) {
-        if (![_photo underlyingImage]) {
+        UIImage *thumbnail = [_photo respondsToSelector:@selector(gridThumbnailImage)] ? _photo.gridThumbnailImage : nil;
+        if (!thumbnail && ![_photo underlyingImage]) {
             [self showLoadingIndicator];
         } else {
-            [self hideLoadingIndicator];
+            [self displayImage];
         }
     } else {
         [self showImageFailure];
@@ -142,34 +124,16 @@
 
 - (void)displayImage {
     UIImage *gridImage = nil;
-    if ([_photo respondsToSelector:@selector(isZoom)] && _photo.isZoom &&
-        [_photo respondsToSelector:@selector(gridThumbnailImage)]) {
+    if ([_photo respondsToSelector:@selector(gridThumbnailImage)]) {
         gridImage = _photo.gridThumbnailImage;
     }
     _imageView.image = gridImage ?: [_photo underlyingImage];
-    _selectedButton.hidden = !_selectionMode;
     [self hideImageFailure];
     // 拿到可展示的图才收起进度环；否则保持加载态（不能无条件隐藏，
     // 否则缩略图未就绪时进度环会提前消失）
     if (_imageView.image) {
         [self hideLoadingIndicator];
     }
-}
-
-#pragma mark - Selection
-
-- (void)setSelectionMode:(BOOL)selectionMode {
-    _selectionMode = selectionMode;
-}
-
-- (void)setIsSelected:(BOOL)isSelected {
-    _isSelected = isSelected;
-    _selectedButton.selected = isSelected;
-}
-
-- (void)selectionButtonPressed {
-    _selectedButton.selected = !_selectedButton.selected;
-    [_gridController.browser setPhotoSelected:_selectedButton.selected atIndex:_index];
 }
 
 #pragma mark - Touches
@@ -252,7 +216,8 @@
 - (void)handleMWPhotoLoadingDidEndNotification:(NSNotification *)notification {
     id <MWPhoto> photo = [notification object];
     if (photo == _photo) {
-        if ([photo underlyingImage]) {
+        UIImage *thumbnail = [photo respondsToSelector:@selector(gridThumbnailImage)] ? photo.gridThumbnailImage : nil;
+        if (thumbnail || [photo underlyingImage]) {
             // Successful load
             [self displayImage];
         } else {
