@@ -124,7 +124,7 @@
     if (!_enableGrid) _startOnGrid = NO;
 
     // View
-    self.view.backgroundColor = [UIColor clearColor];
+    self.view.backgroundColor = [UIColor blackColor];
     self.view.opaque = NO;
     self.view.clipsToBounds = YES;
 

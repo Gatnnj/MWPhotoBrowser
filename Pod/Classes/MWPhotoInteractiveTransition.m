@@ -103,8 +103,8 @@
         case UIGestureRecognizerStateChanged: {
             if (!self.interacting || !self.dragSnapshot) return;
             CGFloat height = MAX(root.bounds.size.height, 1);
-            CGFloat downward = MAX(0, translation.y);
-            CGFloat scale = MAX(0.42, 1.0 - downward / (height * 1.65));
+            CGFloat verticalDistance = ABS(translation.y);
+            CGFloat scale = MAX(0.42, 1.0 - verticalDistance / (height * 1.65));
             CGPoint current = [pan locationInView:root];
             CGPoint centerInWindow = [root convertPoint:current toView:self.overlayWindow];
             centerInWindow.x -= self.touchOffset.x * scale;
@@ -115,9 +115,9 @@
             frame.origin = CGPointMake(centerInWindow.x - frame.size.width * 0.5,
                                        centerInWindow.y - frame.size.height * 0.5);
             self.dragSnapshot.frame = frame;
-            // 参考 YBImageBrowser：透明度从手势起点开始随下拉距离变化，
-            // 轻微下拉即可看见底层；上拉时 downward 为 0，背景保持全黑。
-            CGFloat progress = MIN(1, downward / (height * 0.5));
+            // Match YBImageBrowser: scale and fade symmetrically for either
+            // vertical drag direction.
+            CGFloat progress = MIN(1, verticalDistance / (height * 0.5));
             CGFloat alpha = pow(1 - progress, 2.0);
             if (self.setBackgroundAlpha) self.setBackgroundAlpha(alpha);
             break;
@@ -125,7 +125,7 @@
         case UIGestureRecognizerStateEnded: {
             if (!self.interacting) return;
             CGPoint velocity = [pan velocityInView:root];
-            BOOL dismiss = translation.y > root.bounds.size.height * self.dismissScale || velocity.y > self.dismissVelocityY;
+            BOOL dismiss = ABS(translation.y) > root.bounds.size.height * self.dismissScale || ABS(velocity.y) > self.dismissVelocityY;
             if (dismiss) [self mw_finishDismiss];
             else [self mw_restore];
             break;
@@ -191,7 +191,7 @@
     // black placeholder, so wait until real image content is available.
     if (![image isKindOfClass:[UIImageView class]] || !image.window || !((UIImageView *)image).image) return NO;
     CGPoint velocity = [gesture velocityInView:gesture.view];
-    return velocity.y > 0 && velocity.y > fabs(velocity.x) * 1.15;
+    return fabs(velocity.y) > fabs(velocity.x) * 1.15;
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer { return YES; }

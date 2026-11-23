@@ -28,7 +28,7 @@
     appearance.backgroundEffect = nil;
     appearance.shadowColor = [UIColor clearColor];
     appearance.shadowImage = nil;
-    appearance.titleTextAttributes = @{ NSForegroundColorAttributeName: [UIColor whiteColor] };
+    appearance.titleTextAttributes = @{NSFontAttributeName:[UIFont systemFontOfSize:15],NSForegroundColorAttributeName:[UIColor whiteColor]};
     navBar.standardAppearance = appearance;
     navBar.scrollEdgeAppearance = appearance;
     navBar.compactAppearance = appearance;

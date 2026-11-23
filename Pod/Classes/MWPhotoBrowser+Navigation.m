@@ -16,19 +16,13 @@
     NSUInteger numberOfPhotos = [self numberOfPhotos];
     if (_gridController) {
         {
-            NSString *photosText;
-            if (numberOfPhotos == 1) {
-                photosText = NSLocalizedString(@"photo", @"Used in the context: '1 photo'");
-            } else {
-                photosText = NSLocalizedString(@"photos", @"Used in the context: '3 photos'");
-            }
-            self.navigationItem.title = [NSString stringWithFormat:@"%lu %@", (unsigned long)numberOfPhotos, photosText];
+            self.navigationItem.title = @"全部图片";
         }
     } else if (numberOfPhotos > 1) {
         if ([self.delegate respondsToSelector:@selector(photoBrowser:titleForPhotoAtIndex:)]) {
             self.navigationItem.title = [self.delegate photoBrowser:self titleForPhotoAtIndex:_currentPageIndex];
         } else {
-            self.navigationItem.title = [NSString stringWithFormat:@"%lu %@ %lu", (unsigned long)(_currentPageIndex+1), NSLocalizedString(@"of", @"Used in the context: 'Showing 1 of 3 items'"), (unsigned long)numberOfPhotos];
+            self.navigationItem.title = [NSString stringWithFormat:@"%lu/%lu", (unsigned long)(_currentPageIndex+1), (unsigned long)numberOfPhotos];
         }
     } else {
         self.navigationItem.title = nil;
