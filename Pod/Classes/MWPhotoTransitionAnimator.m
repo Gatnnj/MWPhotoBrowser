@@ -2,12 +2,13 @@
 
 @interface MWPhotoTransitionAnimator ()
 @property (nonatomic, weak) UIView *hiddenSourceView;
+@property (nonatomic, weak) UIView *hiddenDestinationView;
 @end
 
 @implementation MWPhotoTransitionAnimator
 
 - (instancetype)init {
-    if ((self = [super init])) _duration = 0.32;
+    if ((self = [super init])) _duration = 0.25;
     return self;
 }
 
@@ -20,17 +21,43 @@
 
 - (UIImageView *)mw_imageViewWithImage:(UIImage *)image from:(UIView *)reference {
     UIImageView *view = [[UIImageView alloc] initWithImage:image];
-    view.contentMode = UIViewContentModeScaleAspectFill;
-    view.clipsToBounds = YES;
+    if ([reference isKindOfClass:UIImageView.class]) {
+        UIImageView *referenceImageView = (UIImageView *)reference;
+        view.contentMode = referenceImageView.contentMode;
+        view.clipsToBounds = referenceImageView.clipsToBounds;
+        view.backgroundColor = referenceImageView.backgroundColor;
+        view.layer.cornerRadius = referenceImageView.layer.cornerRadius;
+        view.layer.masksToBounds = referenceImageView.layer.masksToBounds;
+    } else {
+        view.contentMode = UIViewContentModeScaleAspectFit;
+        view.clipsToBounds = YES;
+    }
     if (reference) {
         view.layer.cornerRadius = reference.layer.cornerRadius;
-        view.layer.masksToBounds = YES;
     }
     return view;
 }
 
 - (BOOL)mw_validSourceIn:(UIView *)container {
     return self.startView && self.startView.window && self.transitionImage && self.transitionImage.size.width > 0 && self.transitionImage.size.height > 0 && container.bounds.size.width > 0;
+}
+
+- (CGRect)mw_aspectFitFrameForImage:(UIImage *)image inBounds:(CGRect)bounds {
+    if (image.size.width <= 0 || image.size.height <= 0) return CGRectZero;
+    CGFloat scale = MIN(CGRectGetWidth(bounds) / image.size.width,
+                        CGRectGetHeight(bounds) / image.size.height);
+    CGSize size = CGSizeMake(image.size.width * scale, image.size.height * scale);
+    return CGRectMake(CGRectGetMidX(bounds) - size.width * 0.5,
+                      CGRectGetMidY(bounds) - size.height * 0.5,
+                      size.width, size.height);
+}
+
+- (UIView *)mw_blackBackdropInContainer:(UIView *)container alpha:(CGFloat)alpha {
+    UIView *backdrop = [[UIView alloc] initWithFrame:container.bounds];
+    backdrop.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    backdrop.backgroundColor = [UIColor colorWithWhite:0 alpha:alpha];
+    [container addSubview:backdrop];
+    return backdrop;
 }
 
 - (void)mw_present:(id<UIViewControllerContextTransitioning>)ctx {
@@ -52,24 +79,28 @@
     }
 
     CGRect start = [self.startView convertRect:self.startView.bounds toView:container];
-    CGRect end = CGRectMake((CGRectGetWidth(container.bounds) - self.transitionImage.size.width * MIN(CGRectGetWidth(container.bounds) / self.transitionImage.size.width, CGRectGetHeight(container.bounds) / self.transitionImage.size.height)) * 0.5,
-                            (CGRectGetHeight(container.bounds) - self.transitionImage.size.height * MIN(CGRectGetWidth(container.bounds) / self.transitionImage.size.width, CGRectGetHeight(container.bounds) / self.transitionImage.size.height)) * 0.5,
-                            self.transitionImage.size.width * MIN(CGRectGetWidth(container.bounds) / self.transitionImage.size.width, CGRectGetHeight(container.bounds) / self.transitionImage.size.height),
-                            self.transitionImage.size.height * MIN(CGRectGetWidth(container.bounds) / self.transitionImage.size.width, CGRectGetHeight(container.bounds) / self.transitionImage.size.height));
+    // YBImageBrowser does not build its image cell until the opening flight
+    // finishes. Keep the presented controller hidden and animate a standalone
+    // thumbnail snapshot to the image's fitted full-screen frame first.
+    CGRect end = [self mw_aspectFitFrameForImage:self.transitionImage inBounds:container.bounds];
     UIImageView *moving = [self mw_imageViewWithImage:self.transitionImage from:self.startView];
     moving.frame = start;
+    moving.image = self.transitionImage;
     [container addSubview:moving];
     self.hiddenSourceView = self.startView;
     self.startView.hidden = YES;
+    UIView *backdrop = [self mw_blackBackdropInContainer:container alpha:0];
+    [container bringSubviewToFront:moving];
     toView.alpha = 0;
-    [UIView animateWithDuration:self.duration delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+    [UIView animateWithDuration:self.duration animations:^{
         moving.frame = end;
-        toView.alpha = 1;
+        backdrop.backgroundColor = UIColor.blackColor;
     } completion:^(BOOL finished) {
         BOOL completed = !ctx.transitionWasCancelled;
         [moving removeFromSuperview];
         self.hiddenSourceView.hidden = NO;
         toView.alpha = 1;
+        [backdrop removeFromSuperview];
         if (!completed) [toView removeFromSuperview];
         [ctx completeTransition:completed];
     }];
@@ -85,6 +116,7 @@
     if (!canZoom) {
         [UIView animateWithDuration:self.duration animations:^{ fromView.alpha = 0; } completion:^(BOOL finished) {
             BOOL completed = !ctx.transitionWasCancelled;
+            target.hidden = NO;
             fromView.alpha = 1;
             [ctx completeTransition:completed];
         }];
@@ -93,22 +125,26 @@
 
     CGRect start = [source convertRect:source.bounds toView:container];
     CGRect end = [target convertRect:target.bounds toView:container];
+    // YBImageBrowser changes the flying image to the destination thumbnail's
+    // content mode before shrinking it back into that thumbnail.
     UIImageView *moving = [self mw_imageViewWithImage:((UIImageView *)source).image from:target];
-    moving.contentMode = UIViewContentModeScaleAspectFit;
     moving.frame = start;
     [container addSubview:moving];
-    fromView.alpha = 1;
+    UIView *backdrop = [self mw_blackBackdropInContainer:container alpha:1];
+    [container bringSubviewToFront:moving];
+    fromView.alpha = 0;
     source.hidden = YES;
     target.hidden = YES;
-    [UIView animateWithDuration:self.duration delay:0 usingSpringWithDamping:0.92 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+    [UIView animateWithDuration:self.duration animations:^{
         moving.frame = end;
-        fromView.alpha = 0;
+        backdrop.backgroundColor = [UIColor colorWithWhite:0 alpha:0];
     } completion:^(BOOL finished) {
         BOOL completed = !ctx.transitionWasCancelled;
         [moving removeFromSuperview];
         source.hidden = NO;
         target.hidden = NO;
         fromView.alpha = 1;
+        [backdrop removeFromSuperview];
         [ctx completeTransition:completed];
     }];
 }

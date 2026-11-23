@@ -2,18 +2,21 @@
 
 @interface MWPhotoInteractiveTransition () <UIGestureRecognizerDelegate>
 @property (nonatomic, assign, readwrite) BOOL interacting;
+@property (nonatomic, assign, readwrite, getter=isTransitionInProgress) BOOL transitionInProgress;
 @property (nonatomic, copy) UIView * (^currentImageViewBlock)(void);
 @property (nonatomic, copy) void (^setPagingEnabled)(BOOL enabled);
 @property (nonatomic, copy) void (^setBackgroundAlpha)(CGFloat alpha);
 @property (nonatomic, copy) UIView * (^dismissTargetBlock)(void);
 @property (nonatomic, copy) void (^dismissBlock)(void);
 @property (nonatomic, weak) UIView *sourceImageView;
+@property (nonatomic, weak) UIView *dismissTargetView;
 @property (nonatomic, weak) UIView *rootView;
 @property (nonatomic, strong) UIView *dragSnapshot;
 @property (nonatomic, weak) UIWindow *overlayWindow;
 @property (nonatomic, assign) CGRect originalFrame;
 @property (nonatomic, assign) CGPoint touchOffset;
 @property (nonatomic, assign) BOOL originalHidden;
+@property (nonatomic, assign) BOOL dismissTargetOriginalHidden;
 @end
 
 @implementation MWPhotoInteractiveTransition
@@ -86,7 +89,12 @@
             self.dragSnapshot.frame = self.originalFrame;
             [window addSubview:self.dragSnapshot];
             image.hidden = YES;
+            UIView *target = self.dismissTargetBlock ? self.dismissTargetBlock() : nil;
+            self.dismissTargetView = target;
+            self.dismissTargetOriginalHidden = target.hidden;
+            target.hidden = YES;
             self.interacting = YES;
+            self.transitionInProgress = YES;
             if (self.setPagingEnabled) self.setPagingEnabled(NO);
             // 清理上一次取消手势可能留下的层状态，确保首帧从完全不透明开始。
             if (self.setBackgroundAlpha) self.setBackgroundAlpha(1);
@@ -139,9 +147,13 @@
         if (self.setBackgroundAlpha) self.setBackgroundAlpha(1);
     } completion:^(BOOL finished) {
         self.sourceImageView.hidden = self.originalHidden;
+        self.dismissTargetView.hidden = self.dismissTargetOriginalHidden;
         [snapshot removeFromSuperview];
         self.dragSnapshot = nil;
+        self.dismissTargetView = nil;
         if (self.setPagingEnabled) self.setPagingEnabled(YES);
+        self.transitionInProgress = NO;
+        if (self.interactionDidRestore) self.interactionDidRestore();
     }];
 }
 
@@ -149,8 +161,13 @@
     UIView *snapshot = self.dragSnapshot;
     UIWindow *window = self.overlayWindow;
     UIView *root = self.rootView;
-    if (!snapshot || !window || !root) { if (self.dismissBlock) self.dismissBlock(); return; }
-    UIView *target = self.dismissTargetBlock ? self.dismissTargetBlock() : nil;
+    UIView *target = self.dismissTargetView ?: (self.dismissTargetBlock ? self.dismissTargetBlock() : nil);
+    if (!snapshot || !window || !root) {
+        target.hidden = self.dismissTargetOriginalHidden;
+        self.dismissTargetView = nil;
+        if (self.dismissBlock) self.dismissBlock();
+        return;
+    }
     self.interacting = NO;
     CGRect endFrame = target.window ? [target convertRect:target.bounds toView:window] : CGRectMake(CGRectGetMidX(window.bounds) - 12, CGRectGetMidY(window.bounds) - 12, 24, 24);
     [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
@@ -159,6 +176,10 @@
     } completion:^(BOOL finished) {
         [snapshot removeFromSuperview];
         self.dragSnapshot = nil;
+        // Reveal the real cover on the same frame the moving snapshot lands;
+        // the browser is still covering the list until dismissBlock runs.
+        target.hidden = self.dismissTargetOriginalHidden;
+        self.dismissTargetView = nil;
         if (self.dismissBlock) self.dismissBlock();
     }];
 }

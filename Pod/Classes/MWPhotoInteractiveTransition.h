@@ -16,6 +16,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 是否正在交互（供外部读取）
 @property (nonatomic, assign, readonly) BOOL interacting;
+/// 手势、拖拽快照或回弹动画仍在进行时为 YES。
+@property (nonatomic, assign, readonly, getter=isTransitionInProgress) BOOL transitionInProgress;
+/// 手势回弹并清理快照后调用。
+@property (nonatomic, copy, nullable) void (^interactionDidRestore)(void);
 
 /// 关闭判定阈值（可微调）
 @property (nonatomic, assign) CGFloat dismissScale;

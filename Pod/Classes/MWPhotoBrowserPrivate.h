@@ -14,15 +14,19 @@
 @class MWPhotoInteractiveTransition;
 @class MWPhotoTransitionAnimator;
 
+#ifndef PADDING
+#define PADDING 10
+#endif
+
 // Declare private methods of browser
 // 遵循 UIViewControllerTransitioningDelegate 以提供自定义丝滑转场
-@interface MWPhotoBrowser () <UIViewControllerTransitioningDelegate> {
+@interface MWPhotoBrowser () <UIViewControllerTransitioningDelegate, UIGestureRecognizerDelegate> {
     
 	// Data
     NSUInteger _photoCount;
     NSMutableArray *_photos;
     NSMutableArray *_thumbPhotos;
-	NSArray *_fixedPhotosArray; // Provided via init
+	NSArray<id<MWPhoto>> *_fixedPhotosArray; // Provided via init
 	
 	// Views
 	UIScrollView *_pagingScrollView;
@@ -38,11 +42,13 @@
     MWToolBar *_toolbar;
 	NSTimer *_controlVisibilityTimer;
     dispatch_block_t _pendingTapToggleBlock; // 排队中的单击切换显隐，可被双击或退出取消
-	UIBarButtonItem *_doneButton;
     
     // Grid
     MWGridViewController *_gridController;
     UIBarButtonItem *_gridPreviousLeftNavItem;
+    UIPanGestureRecognizer *_gridDismissPanGesture;
+    BOOL _gridTransitioning;
+    BOOL _pendingReloadData;
     
     // Appearance
     BOOL _previousNavBarHidden;
@@ -51,8 +57,11 @@
     // _previousStatusBarStyle 已移除：现代状态栏机制下无需手动保存/恢复样式
     UIColor *_previousNavBarTintColor;
     UIColor *_previousNavBarBarTintColor;
-    UIBarButtonItem *_previousViewControllerBackButton;
     UIImage *_previousNavigationBarBackgroundImageDefault;
+    UINavigationBarAppearance *_previousNavBarStandardAppearance;
+    UINavigationBarAppearance *_previousNavBarScrollEdgeAppearance;
+    UINavigationBarAppearance *_previousNavBarCompactAppearance;
+    UINavigationBarAppearance *_previousNavBarCompactScrollEdgeAppearance;
     // _previousNavigationBarBackgroundImageLandscapePhone 已移除：iOS 8 后横屏使用统一 metrics
 
     
@@ -80,6 +89,7 @@
 - (void)performLayout;
 - (BOOL)presentingViewControllerPrefersStatusBarHidden;
 - (UIView *)mw_startingView;
+- (void)handleGridDismissPan:(UIPanGestureRecognizer *)pan;
 
 // Nav Bar Appearance
 - (void)setNavBarAppearance:(BOOL)animated;
@@ -100,9 +110,8 @@
 - (CGRect)frameForPageAtIndex:(NSUInteger)index;
 - (CGSize)contentSizeForPagingScrollView;
 - (CGPoint)contentOffsetForPageAtIndex:(NSUInteger)index;
+- (UIInterfaceOrientation)mw_currentInterfaceOrientation;
 - (CGRect)frameForToolbarAtOrientation:(UIInterfaceOrientation)orientation;
-- (CGRect)frameForCaptionView:(MWCaptionView *)captionView atIndex:(NSUInteger)index;
-- (CGRect)frameForSelectedButton:(UIButton *)selectedButton atIndex:(NSUInteger)index;
 
 // Navigation
 - (void)updateNavigation;
@@ -111,8 +120,16 @@
 - (void)gotoNextPage;
 
 // Grid
+- (void)showGridAnimated;
 - (void)showGrid:(BOOL)animated;
 - (void)hideGrid;
+
+// Misc
+- (void)doneButtonPressed:(id)sender;
+- (void)customToolBarItems:(NSArray<UIButton *> *)array;
+- (void)handleMWPhotoLoadingDidEndNotification:(NSNotification *)notification;
+- (void)showPreviousPhotoAnimated:(BOOL)animated;
+- (void)showNextPhotoAnimated:(BOOL)animated;
 
 // Controls
 - (void)cancelControlHiding;
@@ -126,11 +143,9 @@
 
 // Data
 - (NSUInteger)numberOfPhotos;
-- (id<MWPhoto>)photoAtIndex:(NSUInteger)index;
-- (id<MWPhoto>)thumbPhotoAtIndex:(NSUInteger)index;
+- (nullable id<MWPhoto>)photoAtIndex:(NSUInteger)index;
+- (nullable id<MWPhoto>)thumbPhotoAtIndex:(NSUInteger)index;
 - (UIImage *)imageForPhoto:(id<MWPhoto>)photo;
-- (BOOL)photoIsSelectedAtIndex:(NSUInteger)index;
-- (void)setPhotoSelected:(BOOL)selected atIndex:(NSUInteger)index;
 - (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo;
 - (void)releaseAllUnderlyingPhotos:(BOOL)preserveCurrent;
 

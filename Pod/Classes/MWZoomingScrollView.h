@@ -11,25 +11,24 @@
 #import "MWTapDetectingImageView.h"
 #import "MWTapDetectingView.h"
 
-@class MWPhotoBrowser, MWPhoto, MWCaptionView;
+@class MWPhotoBrowser, MWPhoto;
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate> {
-
-}
+@interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate>
 
 @property () NSUInteger index;
 @property (nonatomic, nullable) id <MWPhoto> photo;
-@property (nonatomic, weak, nullable) MWCaptionView *captionView;
-@property (nonatomic, weak, nullable) UIButton *selectedButton;
 
-- (id)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
+- (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
 - (void)displayImage;
 - (void)displayImageFailure;
 - (void)setMaxMinZoomScalesForCurrentBounds;
 - (void)prepareForReuse;
 - (void)setImageHidden:(BOOL)hidden;
+
+/// Rebinds refreshed photo data without clearing the currently visible image.
+- (void)reloadPhotoKeepingDisplayedImage:(nullable id<MWPhoto>)photo;
 
 // 暴露所属浏览器，供交互控制器复位时重算布局
 - (nullable MWPhotoBrowser *)photoBrowser;
