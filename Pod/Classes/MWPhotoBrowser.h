@@ -9,6 +9,7 @@
 #import <UIKit/UIKit.h>
 #import "MWPhoto.h"
 #import "MWPhotoProtocol.h"
+#import "MWToolBar.h"
 
 // Debug Logging
 #if 0 // Set to 1 to enable debug logging
@@ -90,6 +91,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 // ToolBar
 - (void)customToolBarItems:(NSArray<UIButton *> *)array;
+/// Sets the toolbar to the left, bottom, or right edge. Clears any custom frame.
+- (void)customToolBarPosition:(MWToolBarPosition)position;
+/// Uses the supplied frame in the photo browser's view coordinate system.
+- (void)customToolBarFrame:(CGRect)frame;
 @end
 
 NS_ASSUME_NONNULL_END

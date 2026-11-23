@@ -148,11 +148,8 @@
 }
 
 - (CGRect)frameForToolbarAtOrientation:(UIInterfaceOrientation)orientation {
-    CGFloat width = self.view.bounds.size.width;
-    CGFloat height = 83;
-    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone &&
-        UIInterfaceOrientationIsLandscape(orientation)) height = self.view.bounds.size.width;
-    return CGRectIntegral(CGRectMake(0, self.view.bounds.size.height - height, width, height));
+    (void)orientation;
+    return CGRectIntegral([_toolbar frameForContainerBounds:self.view.bounds safeAreaInsets:self.view.safeAreaInsets]);
 }
 
 @end

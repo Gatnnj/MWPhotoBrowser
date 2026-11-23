@@ -251,7 +251,27 @@
 
 /// add toolBar
 - (void)customToolBarItems:(NSArray<UIButton *> *)array {
+    [self loadViewIfNeeded];
     [_toolbar addItems:array];
+    [_toolbar setNeedsLayout];
+    [self.view setNeedsLayout];
+}
+
+- (void)customToolBarPosition:(MWToolBarPosition)position {
+    [self loadViewIfNeeded];
+    _toolbar.customFrame = nil;
+    _toolbar.position = position;
+    _toolbar.frame = [self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]];
+    [_toolbar setNeedsLayout];
+    [self.view setNeedsLayout];
+}
+
+- (void)customToolBarFrame:(CGRect)frame {
+    [self loadViewIfNeeded];
+    _toolbar.customFrame = [NSValue valueWithCGRect:frame];
+    _toolbar.frame = frame;
+    [_toolbar setNeedsLayout];
+    [self.view setNeedsLayout];
 }
 
 #pragma mark - Appearance

@@ -33,7 +33,7 @@ MWPhotoBrowser is available through [CocoaPods](http://cocoapods.org). To instal
 it, simply add the following line to your Podfile:
 
 ```ruby
-pod "MWPhotoBrowser", ~> "https://github.com/Gatnnj/MWPhotoBrowser.git"
+pod 'MWPhotoBrowser',:git => 'https://github.com/Gatnnj/MWPhotoBrowser.git'
 ```
 
 

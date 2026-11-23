@@ -1,5 +1,5 @@
 PODS:
-  - MWPhotoBrowser (3.0.0):
+  - MWPhotoBrowser (3.1.0):
     - SDWebImage (>= 5.0.0)
   - SDWebImage (5.21.7):
     - SDWebImage/Core (= 5.21.7)
@@ -17,7 +17,7 @@ EXTERNAL SOURCES:
     :path: "../"
 
 SPEC CHECKSUMS:
-  MWPhotoBrowser: c8c599f224bc7f69385cce89528e577111d49507
+  MWPhotoBrowser: 697260a2e43719fb1c94d3792ae4d54fae8e9b63
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
 
 PODFILE CHECKSUM: b31528e7a6a7343e6b1ed726be16f89574a4df7d
