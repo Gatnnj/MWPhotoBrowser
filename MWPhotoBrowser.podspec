@@ -16,10 +16,11 @@ Pod::Spec.new do |s|
 
   s.source = {
     :git => 'https://github.com/Gatnnj/MWPhotoBrowser.git',
-    :tag => ''
+    :tag => s.version.to_s
   }
   s.platform = :ios, '13.0'
   s.source_files = 'Pod/Classes/**/*'
+  # 与 Package.swift 共用同一份源码与资源；SPM 侧产物为 MWPhotoBrowser_MWPhotoBrowser.bundle
   # 图标统一收进 asset catalog：打包时由 actool 编译进 MWPhotoBrowser.bundle 的 Assets.car。
   # 好处是只保留一份源文件、自动匹配 @1x/@2x/@3x、支持 App Thinning / Dark Mode，
   # 并且资源名被限定在库自己的 bundle 里，不会和宿主 app 的同名图片冲突。
@@ -28,9 +29,9 @@ Pod::Spec.new do |s|
   }
   s.requires_arc = true
 
-  # AssetsLibrary、MediaPlayer 已移除（iOS 9 废弃），
-  # 替换为视频所需的 AVKit/AVFoundation，Photos 由弱框架改为强依赖
-  s.frameworks = 'ImageIO', 'QuartzCore', 'AVKit', 'AVFoundation', 'Photos'
+  # AssetsLibrary、MediaPlayer 已移除（iOS 9 废弃）；视频能力已下线，
+  # 因此不再声明 AVKit / AVFoundation，仅保留图片链路所需的框架
+  s.frameworks = 'ImageIO', 'QuartzCore', 'Photos'
 
   # SDWebImage
   # 3.7.2 contains bugs downloading local files

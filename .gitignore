@@ -34,3 +34,8 @@ Carthage
 
 # CocoaPods
 Example/Pods/
+
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
