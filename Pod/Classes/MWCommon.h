@@ -11,6 +11,8 @@
 
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 /// 将形如 @"15.2.1" 的版本字符串与当前系统版本进行比较
 /// @param version 目标版本字符串，缺省的版本段按 0 处理
 /// @return 系统版本高于目标版本返回 NSOrderedDescending，相等返回 NSOrderedSame，低于返回 NSOrderedAscending
@@ -49,3 +51,5 @@ static inline NSComparisonResult MWCompareSystemVersion(NSString *version) {
 #define SYSTEM_VERSION_LESS_THAN(v)                 (MWCompareSystemVersion(v) == NSOrderedAscending)
 /// 系统版本是否低于或等于指定版本
 #define SYSTEM_VERSION_LESS_THAN_OR_EQUAL_TO(v)     (MWCompareSystemVersion(v) != NSOrderedDescending)
+
+NS_ASSUME_NONNULL_END

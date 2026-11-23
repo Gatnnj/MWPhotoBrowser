@@ -32,10 +32,6 @@ self.photos = [NSMutableArray array];
 [photos addObject:[MWPhoto photoWithURL:[NSURL URLWithString:@"http://farm4.static.flickr.com/3629/3339128908_7aecabc34b.jpg"]]];
 [photos addObject:[MWPhoto photoWithURL:[NSURL URLWithString:@"http://farm4.static.flickr.com/3590/3329114220_5fbc5bc92b.jpg"]]];
 
-// Add video with poster photo
-MWPhoto *video = [MWPhoto photoWithURL:[NSURL URLWithString:@"https://scontent.cdninstagram.com/hphotos-xpt1/t51.2885-15/e15/11192696_824079697688618_1761661_n.jpg"]];
-video.videoURL = [[NSURL alloc] initWithString:@"https://scontent.cdninstagram.com/hphotos-xpa1/t50.2886-16/11200303_1440130956287424_1714699187_n.mp4"];
-[photos addObject:video];
 
 // Create browser (must be done each time photo browser is
 // displayed. Photo browser objects cannot be re-used)
@@ -48,7 +44,6 @@ browser.zoomPhotosToFill = YES; // Images that almost fill the screen will be in
 browser.alwaysShowControls = NO; // Allows to control whether the bars and controls are always visible or whether they fade away to show the photo full (defaults to NO)
 browser.enableGrid = YES; // Whether to allow the viewing of all the photo thumbnails on a grid (defaults to YES)
 browser.startOnGrid = NO; // Whether to start on the grid of thumbnails instead of the first photo (defaults to NO)
-browser.autoPlayOnAppear = NO; // Auto-play first video
 
 // Customise selection images to change colours if required
 browser.customImageSelectedIconName = @"ImageSelected.png";
@@ -82,39 +77,6 @@ Then respond to the required delegate methods:
 ```
 
 You can present the browser modally simply by wrapping it in a new navigation controller and presenting that. The demo app allows you to toggle between the two presentation types.
-
-
-### Videos
-
-You can represent videos in MWPhoto objects by providing a standard MWPhoto image object with a `videoURL`. You can also use a `PHAsset` object or a URL to an assets library video.
-
-```obj-c
-
-// Video with URL including poster photo
-MWPhoto *video = [MWPhoto photoWithURL:[NSURL URLWithString:@"https://scontent.cdninstagram.com/hphotos-xpt1/t51.2885-15/e15/11192696_824079697688618_1761661_n.jpg"]];
-video.videoURL = [NSURL URLWithString:@"https://scontent.cdninstagram.com/hphotos-xpa1/t50.2886-16/11200303_1440130956287424_1714699187_n.mp4"];
-
-// Video with PHAsset
-MWPhoto *video = [MWPhoto photoWithAsset:asset targetSize:[UIScreen mainScreen].bounds.size]; // Example sizing
-
-// Video with ALAsset
-MWPhoto *video = [MWPhoto photoWithURL:asset.defaultRepresentation.url];
-if ([asset valueForProperty:ALAssetPropertyType] == ALAssetTypeVideo) {
-    photo.videoURL = asset.defaultRepresentation.url;
-}
-
-// Video with no poster photo
-MWPhoto *video = [MWPhoto videoWithURL:[NSURL URLWithString:@"https://scontent.cdninstagram.com/hphotos-xfa1/t50.2886-16/11237510_945154435524423_2137519922_n.mp4"]];
-
-// Video grid thumbnail
-MWPhoto *videoThumb = [MWPhoto photoWithURL:[NSURL URLWithString:@"https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s150x150/e15/11240463_963135443745570_1519872157_n.jpg"]];
-videoThumb.isVideo = YES;
-
-// Video grid thumbnail for video with no poster photo
-MWPhoto *videoThumb = [MWPhoto new];
-videoThumb.isVideo = YES;
-
-```
 
 
 ### Grid

@@ -39,6 +39,9 @@ typedef NS_ENUM(NSInteger, MWPhotoTransitionType) {
 /// 出场时浏览器内当前显示的图片视图，用于取其当前实际位置（含拖拽 transform）
 @property (nonatomic, weak, nullable) UIView *dismissingImageView;
 
+/// 入场时浏览器内实际显示的图片视图，用于读取真实目标位置。
+@property (nonatomic, weak, nullable) UIView *destinationImageView;
+
 /// 入场时用于连贯移动的图片（通常取 startView 上的 image）
 @property (nonatomic, strong, nullable) UIImage *transitionImage;
 

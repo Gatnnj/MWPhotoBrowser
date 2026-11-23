@@ -7,7 +7,7 @@
 //
 
 #import "AppDelegate.h"
-//#import "Menu.h"
+#import "MWRootTabBarController.h"
 
 @implementation AppDelegate
 
@@ -17,12 +17,11 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-//    self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-//    
-//    Menu *menu = [[Menu alloc] initWithStyle:UITableViewStylePlain];
-//    self.viewController = (UIViewController *)[[UINavigationController alloc] initWithRootViewController:menu];
-//    self.window.rootViewController = self.viewController;
-//    [self.window makeKeyAndVisible];
+    UIWindow *window = self.window ?: [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    window.backgroundColor = [UIColor systemBackgroundColor];
+    window.rootViewController = [[MWRootTabBarController alloc] init];
+    self.window = window;
+    [self.window makeKeyAndVisible];
     return YES;
 }
 

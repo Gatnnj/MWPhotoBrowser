@@ -29,8 +29,14 @@
 
 @implementation MWZoomingScrollView
 
-- (id)initWithPhotoBrowser:(MWPhotoBrowser *)browser {
+- (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser {
     if ((self = [super init])) {
+
+        // Keep the iOS 26 scroll-edge fade from tinting the image beneath the
+        // transparent navigation bar.
+        if (@available(iOS 26.0, *)) {
+            self.topEdgeEffect.hidden = YES;
+        }
         
         // Setup
         _index = NSUIntegerMax;
@@ -94,20 +100,38 @@
 - (void)prepareForReuse {
     [self hideImageFailure];
     self.photo = nil;
-    self.captionView = nil;
-    self.selectedButton = nil;
-    self.playButton = nil;
     _photoImageView.hidden = NO;
     _photoImageView.image = nil;
     _index = NSUIntegerMax;
 }
 
-- (BOOL)displayingVideo {
-    return [_photo respondsToSelector:@selector(isVideo)] && _photo.isVideo;
-}
 
 - (void)setImageHidden:(BOOL)hidden {
     _photoImageView.hidden = hidden;
+}
+
+- (void)reloadPhotoKeepingDisplayedImage:(id<MWPhoto>)photo {
+    if (_photo != photo && [_photo respondsToSelector:@selector(cancelAnyLoading)]) {
+        [_photo cancelAnyLoading];
+    }
+    _photo = photo;
+    [self hideImageFailure];
+
+    if (!photo) {
+        _photoImageView.image = nil;
+        self.contentSize = CGSizeZero;
+        [self showLoadingIndicator];
+        return;
+    }
+
+    UIImage *image = [photo underlyingImage];
+    if (image) {
+        [self displayImage];
+    } else {
+        // Keep the old image on screen while the refreshed model loads.
+        [self hideLoadingIndicator];
+        [photo loadUnderlyingImageAndNotify];
+    }
 }
 
 #pragma mark - Image
@@ -131,43 +155,29 @@
 
 // Get and display image
 - (void)displayImage {
-	if (_photo && _photoImageView.image == nil) {
-		
-		// Reset
-		self.maximumZoomScale = 1;
-		self.minimumZoomScale = 1;
-		self.zoomScale = 1;
-		self.contentSize = CGSizeMake(0, 0);
-		
-		// Get image from browser as it handles ordering of fetching
-		UIImage *img = [_photoBrowser imageForPhoto:_photo];
-		if (img) {
-			
-			// Hide indicator
-			[self hideLoadingIndicator];
-			
-			// Set image
-			_photoImageView.image = img;
-			_photoImageView.hidden = NO;
-			
-			// Setup photo frame
-			CGRect photoImageViewFrame;
-			photoImageViewFrame.origin = CGPointZero;
-			photoImageViewFrame.size = img.size;
-			_photoImageView.frame = photoImageViewFrame;
-			self.contentSize = photoImageViewFrame.size;
+    if (!_photo) return;
 
-			// Set zoom to minimum zoom
-			[self setMaxMinZoomScalesForCurrentBounds];
-			
-		} else  {
+    // Get image or start loading. Keep an existing image visible if a refreshed
+    // photo model has not finished loading yet.
+    UIImage *img = [_photoBrowser imageForPhoto:_photo];
+    if (!img || img == _photoImageView.image) return;
 
-            // Show image failure
-            [self displayImageFailure];
-			
-		}
-		[self setNeedsLayout];
-	}
+    // Reset zoom only when the actual displayed bitmap changes.
+    self.maximumZoomScale = 1;
+    self.minimumZoomScale = 1;
+    self.zoomScale = 1;
+    self.contentSize = CGSizeMake(0, 0);
+    [self hideLoadingIndicator];
+    [self hideImageFailure];
+
+    _photoImageView.image = img;
+    _photoImageView.hidden = NO;
+
+    CGRect photoImageViewFrame = CGRectMake(0, 0, img.size.width, img.size.height);
+    _photoImageView.frame = photoImageViewFrame;
+    self.contentSize = photoImageViewFrame.size;
+    [self setMaxMinZoomScalesForCurrentBounds];
+    [self setNeedsLayout];
 }
 
 // Image failed so just show black!
@@ -331,11 +341,6 @@
     // Disable scrolling initially until the first pinch to fix issues with swiping on an initally zoomed in photo
     self.scrollEnabled = NO;
     
-    // If it's a video then disable zooming
-    if ([self displayingVideo]) {
-        self.maximumZoomScale = self.zoomScale;
-        self.minimumZoomScale = self.zoomScale;
-    }
 
     // Layout
 	[self setNeedsLayout];
@@ -438,10 +443,6 @@
 
 - (void)handleDoubleTap:(CGPoint)touchPoint {
     
-    // Dont double tap to zoom if showing a video
-    if ([self displayingVideo]) {
-        return;
-    }
 	
 	// 取消排队中的单击切换显隐（双击缩放后不应再闪一次工具栏）
 	[_photoBrowser cancelPendingTapToggle];

@@ -11,33 +11,34 @@
 #import "MWTapDetectingImageView.h"
 #import "MWTapDetectingView.h"
 
-@class MWPhotoBrowser, MWPhoto, MWCaptionView;
+@class MWPhotoBrowser, MWPhoto;
 
-@interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate> {
+NS_ASSUME_NONNULL_BEGIN
 
-}
+@interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate>
 
 @property () NSUInteger index;
-@property (nonatomic) id <MWPhoto> photo;
-@property (nonatomic, weak) MWCaptionView *captionView;
-@property (nonatomic, weak) UIButton *selectedButton;
-@property (nonatomic, weak) UIButton *playButton;
+@property (nonatomic, nullable) id <MWPhoto> photo;
 
-- (id)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
+- (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
 - (void)displayImage;
 - (void)displayImageFailure;
 - (void)setMaxMinZoomScalesForCurrentBounds;
 - (void)prepareForReuse;
-- (BOOL)displayingVideo;
 - (void)setImageHidden:(BOOL)hidden;
 
+/// Rebinds refreshed photo data without clearing the currently visible image.
+- (void)reloadPhotoKeepingDisplayedImage:(nullable id<MWPhoto>)photo;
+
 // 暴露所属浏览器，供交互控制器复位时重算布局
-- (MWPhotoBrowser *)photoBrowser;
+- (nullable MWPhotoBrowser *)photoBrowser;
 
 // 暴露内部图片视图，供自定义转场获取其当前位置（含拖拽后的 transform）
-- (UIView *)photoImageViewForTransition;
+- (nullable UIView *)photoImageViewForTransition;
 
 // 统一设置页面内部黑色背景的透明度（不影响图片本身），用于拖拽时背景渐隐
 - (void)setBackgroundAlpha:(CGFloat)alpha;
 
 @end
+
+NS_ASSUME_NONNULL_END

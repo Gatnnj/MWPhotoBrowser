@@ -8,12 +8,18 @@
 
 #import <UIKit/UIKit.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @class MWZoomingScrollView;
 
 @interface MWPhotoInteractiveTransition : NSObject
 
 /// 是否正在交互（供外部读取）
 @property (nonatomic, assign, readonly) BOOL interacting;
+/// 手势、拖拽快照或回弹动画仍在进行时为 YES。
+@property (nonatomic, assign, readonly, getter=isTransitionInProgress) BOOL transitionInProgress;
+/// 手势回弹并清理快照后调用。
+@property (nonatomic, copy, nullable) void (^interactionDidRestore)(void);
 
 /// 关闭判定阈值（可微调）
 @property (nonatomic, assign) CGFloat dismissScale;
@@ -25,14 +31,14 @@
 /// @param setPagingEnabled 控制分页 scrollView 是否可滚动
 /// @param setBackgroundAlpha 控制背景透明度
 /// @param dismissBlock 松手判定关闭时回调
-- (instancetype)initWithCurrentImageViewBlock:(UIView * (^)(void))currentImageViewBlock
+- (instancetype)initWithCurrentImageViewBlock:(UIView * _Nullable (^)(void))currentImageViewBlock
                             setPagingEnabled:(void (^)(BOOL enabled))setPagingEnabled
                            setBackgroundAlpha:(void (^)(CGFloat alpha))setBackgroundAlpha
-                           dismissTargetBlock:(UIView * (^)(void))dismissTargetBlock
+                           dismissTargetBlock:(nullable UIView * _Nullable (^)(void))dismissTargetBlock
                                  dismissBlock:(void (^)(void))dismissBlock;
 
 /// 兼容旧初始化接口
-- (instancetype)initWithCurrentImageViewBlock:(UIView * (^)(void))currentImageViewBlock
+- (instancetype)initWithCurrentImageViewBlock:(UIView * _Nullable (^)(void))currentImageViewBlock
                             setPagingEnabled:(void (^)(BOOL enabled))setPagingEnabled
                            setBackgroundAlpha:(void (^)(CGFloat alpha))setBackgroundAlpha
                                  dismissBlock:(void (^)(void))dismissBlock;
@@ -41,3 +47,5 @@
 - (void)installGestureOnRootView:(UIView *)rootView;
 
 @end
+
+NS_ASSUME_NONNULL_END

@@ -56,15 +56,21 @@
     [super viewDidLoad];
     [self.collectionView registerClass:[MWGridCell class] forCellWithReuseIdentifier:@"GridCell"];
     self.collectionView.alwaysBounceVertical = YES;
+    if (@available(iOS 26.0, *)) {
+        self.collectionView.topEdgeEffect.hidden = YES;
+    }
     self.collectionView.backgroundColor = [UIColor blackColor];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
-    // Cancel outstanding loading
+    // Drop decoded thumbnails from the photo objects; their SDWebImage disk
+    // entries remain available if the grid is opened again.
     NSArray *visibleCells = [self.collectionView visibleCells];
     if (visibleCells) {
         for (MWGridCell *cell in visibleCells) {
-            [cell.photo cancelAnyLoading];
+            if ([cell.photo respondsToSelector:@selector(releaseGridThumbnailFromMemory)]) {
+                [cell.photo releaseGridThumbnailFromMemory];
+            }
         }
     }
     [super viewWillDisappear:animated];
@@ -80,15 +86,18 @@
 }
 
 - (void)adjustOffsetsAsRequired {
-    
-    // Move to previous content offset
-    if (_initialContentOffset.y != CGFLOAT_MAX) {
+    BOOL hasInitialContentOffset = _initialContentOffset.y != CGFLOAT_MAX;
+
+    // Move to the requested content offset before checking selected-photo visibility.
+    if (hasInitialContentOffset) {
         self.collectionView.contentOffset = _initialContentOffset;
         [self.collectionView layoutIfNeeded]; // Layout after content offset change
     }
     
     // Check if current item is visible and if not, make it so!
-    if (_browser.numberOfPhotos > 0) {
+    // When the caller explicitly requested a position (MWPhotoBrowser resets
+    // the grid to the top for each presentation), do not scroll away from it.
+    if (!hasInitialContentOffset && _browser.numberOfPhotos > 0) {
         NSIndexPath *currentPhotoIndexPath = [NSIndexPath indexPathForItem:_browser.currentIndex inSection:0];
         NSArray *visibleIndexPaths = [self.collectionView indexPathsForVisibleItems];
         BOOL currentVisible = NO;
@@ -171,25 +180,42 @@
     id <MWPhoto> photo = [_browser thumbPhotoAtIndex:indexPath.row];
     cell.gridController = self;
     cell.photo = photo;
-    cell.selectionMode = _selectionMode;
-    cell.isSelected = [_browser photoIsSelectedAtIndex:indexPath.row];
     cell.index = indexPath.row;
-    UIImage *img = [_browser imageForPhoto:photo];
-    if (img) {
-        [cell displayImage];
+    if ([photo respondsToSelector:@selector(loadGridThumbnailAndNotifyWithPixelSize:)]) {
+        UIImage *thumbnail = [photo respondsToSelector:@selector(gridThumbnailImage)] ? photo.gridThumbnailImage : nil;
+        if (thumbnail) {
+            [cell displayImage];
+        } else {
+            CGFloat scale = UIScreen.mainScreen.scale;
+            CGSize cellSize = cell.bounds.size;
+            if (cellSize.width <= 0 || cellSize.height <= 0) {
+                cellSize = [self collectionView:self.collectionView
+                                         layout:self.collectionView.collectionViewLayout
+                         sizeForItemAtIndexPath:indexPath];
+            }
+            CGSize pixelSize = CGSizeMake(MAX(1, cellSize.width * scale),
+                                          MAX(1, cellSize.height * scale));
+            [photo loadGridThumbnailAndNotifyWithPixelSize:pixelSize];
+        }
     } else {
-        [photo loadUnderlyingImageAndNotify];
+        UIImage *img = [_browser imageForPhoto:photo];
+        if (img) [cell displayImage];
+        else [photo loadUnderlyingImageAndNotify];
     }
     return cell;
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    _browser.isShowGriding = YES;
     [_browser setCurrentPhotoIndex:indexPath.row];
     [_browser hideGrid];
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didEndDisplayingCell:(UICollectionViewCell *)cell forItemAtIndexPath:(NSIndexPath *)indexPath {
-    [((MWGridCell *)cell).photo cancelAnyLoading];
+    id<MWPhoto> photo = ((MWGridCell *)cell).photo;
+    if ([photo respondsToSelector:@selector(releaseGridThumbnailFromMemory)]) {
+        [photo releaseGridThumbnailFromMemory];
+    }
 }
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {

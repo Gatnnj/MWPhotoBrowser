@@ -21,6 +21,8 @@
 //
 // You can see the MWPhoto class for an example implementation of this protocol
 //
+NS_ASSUME_NONNULL_BEGIN
+
 @protocol MWPhoto <NSObject>
 
 @required
@@ -32,7 +34,7 @@
 // fetching of images from any external of source. That should be handled
 // in -loadUnderlyingImageAndNotify: which may be called by the photo browser if this
 // methods returns nil.
-@property (nonatomic, strong) UIImage *underlyingImage;
+@property (nonatomic, strong, nullable) UIImage *underlyingImage;
 
 // Called when the browser has determined the underlying images is not
 // already loaded into memory but needs it.
@@ -60,22 +62,20 @@
 @property (nonatomic) BOOL isBlur;
 /// Optional compressed image used by the grid view when available.
 @property (nonatomic, readonly, nullable) UIImage *gridThumbnailImage;
-@property (nonatomic) BOOL isZoom;
+/// Load a grid-sized decode from the same source URL without retaining the full decoded image.
+- (void)loadGridThumbnailAndNotifyWithPixelSize:(CGSize)pixelSize;
+/// Release the in-memory grid thumbnail when its cell leaves the visible range.
+- (void)releaseGridThumbnailFromMemory;
 // default 30.0
 @property (nonatomic) CGFloat radius;
 
 // If photo is empty, in which case, don't show loading error icons
 @property (nonatomic) BOOL emptyImage;
 
-// Video
-@property (nonatomic) BOOL isVideo;
-- (void)getVideoURL:(void (^)(NSURL *url))completion;
-
-// Return a caption string to be displayed over the image
-// Return nil to display no caption
-- (NSString *)caption;
 
 // Cancel any background loading of image data
 - (void)cancelAnyLoading;
 
 @end
+
+NS_ASSUME_NONNULL_END

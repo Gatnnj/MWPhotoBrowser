@@ -2,18 +2,21 @@
 
 @interface MWPhotoInteractiveTransition () <UIGestureRecognizerDelegate>
 @property (nonatomic, assign, readwrite) BOOL interacting;
+@property (nonatomic, assign, readwrite, getter=isTransitionInProgress) BOOL transitionInProgress;
 @property (nonatomic, copy) UIView * (^currentImageViewBlock)(void);
 @property (nonatomic, copy) void (^setPagingEnabled)(BOOL enabled);
 @property (nonatomic, copy) void (^setBackgroundAlpha)(CGFloat alpha);
 @property (nonatomic, copy) UIView * (^dismissTargetBlock)(void);
 @property (nonatomic, copy) void (^dismissBlock)(void);
 @property (nonatomic, weak) UIView *sourceImageView;
+@property (nonatomic, weak) UIView *dismissTargetView;
 @property (nonatomic, weak) UIView *rootView;
 @property (nonatomic, strong) UIView *dragSnapshot;
 @property (nonatomic, weak) UIWindow *overlayWindow;
 @property (nonatomic, assign) CGRect originalFrame;
 @property (nonatomic, assign) CGPoint touchOffset;
 @property (nonatomic, assign) BOOL originalHidden;
+@property (nonatomic, assign) BOOL dismissTargetOriginalHidden;
 @end
 
 @implementation MWPhotoInteractiveTransition
@@ -86,7 +89,12 @@
             self.dragSnapshot.frame = self.originalFrame;
             [window addSubview:self.dragSnapshot];
             image.hidden = YES;
+            UIView *target = self.dismissTargetBlock ? self.dismissTargetBlock() : nil;
+            self.dismissTargetView = target;
+            self.dismissTargetOriginalHidden = target.hidden;
+            target.hidden = YES;
             self.interacting = YES;
+            self.transitionInProgress = YES;
             if (self.setPagingEnabled) self.setPagingEnabled(NO);
             // 清理上一次取消手势可能留下的层状态，确保首帧从完全不透明开始。
             if (self.setBackgroundAlpha) self.setBackgroundAlpha(1);
@@ -95,8 +103,8 @@
         case UIGestureRecognizerStateChanged: {
             if (!self.interacting || !self.dragSnapshot) return;
             CGFloat height = MAX(root.bounds.size.height, 1);
-            CGFloat downward = MAX(0, translation.y);
-            CGFloat scale = MAX(0.42, 1.0 - downward / (height * 1.65));
+            CGFloat verticalDistance = ABS(translation.y);
+            CGFloat scale = MAX(0.42, 1.0 - verticalDistance / (height * 1.65));
             CGPoint current = [pan locationInView:root];
             CGPoint centerInWindow = [root convertPoint:current toView:self.overlayWindow];
             centerInWindow.x -= self.touchOffset.x * scale;
@@ -107,9 +115,9 @@
             frame.origin = CGPointMake(centerInWindow.x - frame.size.width * 0.5,
                                        centerInWindow.y - frame.size.height * 0.5);
             self.dragSnapshot.frame = frame;
-            // 参考 YBImageBrowser：透明度从手势起点开始随下拉距离变化，
-            // 轻微下拉即可看见底层；上拉时 downward 为 0，背景保持全黑。
-            CGFloat progress = MIN(1, downward / (height * 0.5));
+            // Match YBImageBrowser: scale and fade symmetrically for either
+            // vertical drag direction.
+            CGFloat progress = MIN(1, verticalDistance / (height * 0.5));
             CGFloat alpha = pow(1 - progress, 2.0);
             if (self.setBackgroundAlpha) self.setBackgroundAlpha(alpha);
             break;
@@ -117,7 +125,7 @@
         case UIGestureRecognizerStateEnded: {
             if (!self.interacting) return;
             CGPoint velocity = [pan velocityInView:root];
-            BOOL dismiss = translation.y > root.bounds.size.height * self.dismissScale || velocity.y > self.dismissVelocityY;
+            BOOL dismiss = ABS(translation.y) > root.bounds.size.height * self.dismissScale || ABS(velocity.y) > self.dismissVelocityY;
             if (dismiss) [self mw_finishDismiss];
             else [self mw_restore];
             break;
@@ -139,9 +147,13 @@
         if (self.setBackgroundAlpha) self.setBackgroundAlpha(1);
     } completion:^(BOOL finished) {
         self.sourceImageView.hidden = self.originalHidden;
+        self.dismissTargetView.hidden = self.dismissTargetOriginalHidden;
         [snapshot removeFromSuperview];
         self.dragSnapshot = nil;
+        self.dismissTargetView = nil;
         if (self.setPagingEnabled) self.setPagingEnabled(YES);
+        self.transitionInProgress = NO;
+        if (self.interactionDidRestore) self.interactionDidRestore();
     }];
 }
 
@@ -149,8 +161,13 @@
     UIView *snapshot = self.dragSnapshot;
     UIWindow *window = self.overlayWindow;
     UIView *root = self.rootView;
-    if (!snapshot || !window || !root) { if (self.dismissBlock) self.dismissBlock(); return; }
-    UIView *target = self.dismissTargetBlock ? self.dismissTargetBlock() : nil;
+    UIView *target = self.dismissTargetView ?: (self.dismissTargetBlock ? self.dismissTargetBlock() : nil);
+    if (!snapshot || !window || !root) {
+        target.hidden = self.dismissTargetOriginalHidden;
+        self.dismissTargetView = nil;
+        if (self.dismissBlock) self.dismissBlock();
+        return;
+    }
     self.interacting = NO;
     CGRect endFrame = target.window ? [target convertRect:target.bounds toView:window] : CGRectMake(CGRectGetMidX(window.bounds) - 12, CGRectGetMidY(window.bounds) - 12, 24, 24);
     [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
@@ -159,6 +176,10 @@
     } completion:^(BOOL finished) {
         [snapshot removeFromSuperview];
         self.dragSnapshot = nil;
+        // Reveal the real cover on the same frame the moving snapshot lands;
+        // the browser is still covering the list until dismissBlock runs.
+        target.hidden = self.dismissTargetOriginalHidden;
+        self.dismissTargetView = nil;
         if (self.dismissBlock) self.dismissBlock();
     }];
 }
@@ -170,7 +191,7 @@
     // black placeholder, so wait until real image content is available.
     if (![image isKindOfClass:[UIImageView class]] || !image.window || !((UIImageView *)image).image) return NO;
     CGPoint velocity = [gesture velocityInView:gesture.view];
-    return velocity.y > 0 && velocity.y > fabs(velocity.x) * 1.15;
+    return fabs(velocity.y) > fabs(velocity.x) * 1.15;
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer { return YES; }
