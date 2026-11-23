@@ -23,7 +23,6 @@
 		0EC5D4C21B4C46E50092ACC1 /* photo7t.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4B11B4C46E50092ACC1 /* photo7t.jpg */; };
 		0EC5D4C31B4C46E50092ACC1 /* photo8.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4B21B4C46E50092ACC1 /* photo8.jpg */; };
 		0EC5D4C41B4C46E50092ACC1 /* photo8t.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0EC5D4B31B4C46E50092ACC1 /* photo8t.jpg */; };
-		1942832C1E2CB74737014B98 /* libPods-MWPhotoBrowser_Tests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0769140F374815C3F8CBBF09 /* libPods-MWPhotoBrowser_Tests.a */; };
 		4C18E11B1B47E72800E3D63A /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C18E1181B47E72800E3D63A /* AppDelegate.m */; };
 		4C18E11C1B47E72800E3D63A /* Menu.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C18E11A1B47E72800E3D63A /* Menu.m */; };
 		6003F58E195388D20070C39A /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6003F58D195388D20070C39A /* Foundation.framework */; };
@@ -88,7 +87,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		0769140F374815C3F8CBBF09 /* libPods-MWPhotoBrowser_Tests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-MWPhotoBrowser_Tests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0EC5D4A41B4C46E50092ACC1 /* photo1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo1.jpg; path = "MWPhotoBrowser/Local Media/photo1.jpg"; sourceTree = SOURCE_ROOT; };
 		0EC5D4A51B4C46E50092ACC1 /* photo1t.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo1t.jpg; path = "MWPhotoBrowser/Local Media/photo1t.jpg"; sourceTree = SOURCE_ROOT; };
 		0EC5D4A61B4C46E50092ACC1 /* photo2.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo2.jpg; path = "MWPhotoBrowser/Local Media/photo2.jpg"; sourceTree = SOURCE_ROOT; };
@@ -106,7 +104,6 @@
 		0EC5D4B21B4C46E50092ACC1 /* photo8.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo8.jpg; path = "MWPhotoBrowser/Local Media/photo8.jpg"; sourceTree = SOURCE_ROOT; };
 		0EC5D4B31B4C46E50092ACC1 /* photo8t.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = photo8t.jpg; path = "MWPhotoBrowser/Local Media/photo8t.jpg"; sourceTree = SOURCE_ROOT; };
 		42FCB8D314CA85E2DF2C6434 /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = LICENSE; path = ../LICENSE; sourceTree = "<group>"; };
-		4BD26BB46B1DBB432DA5ADAC /* Pods-MWPhotoBrowser_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MWPhotoBrowser_Tests.release.xcconfig"; path = "Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests.release.xcconfig"; sourceTree = "<group>"; };
 		4C18E1171B47E72800E3D63A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		4C18E1181B47E72800E3D63A /* AppDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		4C18E1191B47E72800E3D63A /* Menu.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Menu.h; sourceTree = "<group>"; };
@@ -129,7 +126,6 @@
 		606FC2411953D9B200FFA9A0 /* Tests-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Tests-Prefix.pch"; sourceTree = "<group>"; };
 		826C1C95688D2EEBDEE487C9 /* Pods-MWPhotoBrowser_Example.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MWPhotoBrowser_Example.release.xcconfig"; path = "Target Support Files/Pods-MWPhotoBrowser_Example/Pods-MWPhotoBrowser_Example.release.xcconfig"; sourceTree = "<group>"; };
 		873B8AEA1B1F5CCA007FD442 /* Main.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = Main.storyboard; sourceTree = "<group>"; };
-		8C2A9563960271E3AB37F625 /* Pods-MWPhotoBrowser_Tests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MWPhotoBrowser_Tests.debug.xcconfig"; path = "Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests.debug.xcconfig"; sourceTree = "<group>"; };
 		931651473098864200AAAF3F /* YBIBAuxiliaryViewHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = YBIBAuxiliaryViewHandler.h; sourceTree = "<group>"; };
 		931651483098864200AAAF3F /* YBIBAuxiliaryViewHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = YBIBAuxiliaryViewHandler.m; sourceTree = "<group>"; };
 		931651493098864200AAAF3F /* YBIBLoadingView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = YBIBLoadingView.h; sourceTree = "<group>"; };
@@ -239,7 +235,6 @@
 				6003F5B0195388D20070C39A /* XCTest.framework in Frameworks */,
 				6003F5B2195388D20070C39A /* UIKit.framework in Frameworks */,
 				6003F5B1195388D20070C39A /* Foundation.framework in Frameworks */,
-				1942832C1E2CB74737014B98 /* libPods-MWPhotoBrowser_Tests.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,7 +296,6 @@
 				6003F591195388D20070C39A /* UIKit.framework */,
 				6003F5AF195388D20070C39A /* XCTest.framework */,
 				AB6E0C4626651E0B8E71AD86 /* libPods-MWPhotoBrowser_Example.a */,
-				0769140F374815C3F8CBBF09 /* libPods-MWPhotoBrowser_Tests.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -512,8 +506,6 @@
 			children = (
 				B9CF02486C3C97DC82080309 /* Pods-MWPhotoBrowser_Example.debug.xcconfig */,
 				826C1C95688D2EEBDEE487C9 /* Pods-MWPhotoBrowser_Example.release.xcconfig */,
-				8C2A9563960271E3AB37F625 /* Pods-MWPhotoBrowser_Tests.debug.xcconfig */,
-				4BD26BB46B1DBB432DA5ADAC /* Pods-MWPhotoBrowser_Tests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -544,11 +536,9 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 6003F5C2195388D20070C39A /* Build configuration list for PBXNativeTarget "MWPhotoBrowser_Tests" */;
 			buildPhases = (
-				15CF713D353CEDB3A046E722 /* [CP] Check Pods Manifest.lock */,
 				6003F5AA195388D20070C39A /* Sources */,
 				6003F5AB195388D20070C39A /* Frameworks */,
 				6003F5AC195388D20070C39A /* Resources */,
-				4E214725AD42FBAA3C05AE5E /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -634,49 +624,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		15CF713D353CEDB3A046E722 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-MWPhotoBrowser_Tests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		4E214725AD42FBAA3C05AE5E /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests-resources-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			inputPaths = (
-			);
-			name = "[CP] Copy Pods Resources";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Tests/Pods-MWPhotoBrowser_Tests-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 		73D764CF95451DBB01ECE18C /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -685,13 +632,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Example/Pods-MWPhotoBrowser_Example-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-MWPhotoBrowser_Example/Pods-MWPhotoBrowser_Example-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -931,7 +874,6 @@
 		};
 		6003F5C3195388D20070C39A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8C2A9563960271E3AB37F625 /* Pods-MWPhotoBrowser_Tests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				FRAMEWORK_SEARCH_PATHS = (
@@ -957,7 +899,6 @@
 		};
 		6003F5C4195388D20070C39A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4BD26BB46B1DBB432DA5ADAC /* Pods-MWPhotoBrowser_Tests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				FRAMEWORK_SEARCH_PATHS = (
