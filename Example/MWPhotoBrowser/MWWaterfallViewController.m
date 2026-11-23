@@ -334,7 +334,7 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 - (void)showGridVc {
     MWPhotoBrowser *browser = self.activePhotoBrowser;
     if (browser) {
-        browser.startOnGrid = YES;
+        [browser showGridAnimated];
     }
 }
 
@@ -364,16 +364,10 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 }
 
 - (id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser thumbPhotoAtIndex:(NSUInteger)index {
-//    if (index < _thumbs.count)
-//        return [_thumbs objectAtIndex:index];
+    if (index < _photos.count)
+        return [_photos objectAtIndex:index];
     return nil;
 }
-
-//- (MWCaptionView *)photoBrowser:(MWPhotoBrowser *)photoBrowser captionViewForPhotoAtIndex:(NSUInteger)index {
-//    MWPhoto *photo = [self.photos objectAtIndex:index];
-//    MWCaptionView *captionView = [[MWCaptionView alloc] initWithPhoto:photo];
-//    return [captionView autorelease];
-//}
 
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser didDisplayPhotoAtIndex:(NSUInteger)index {
     NSLog(@"Did start viewing photo at index %lu", (unsigned long)index);

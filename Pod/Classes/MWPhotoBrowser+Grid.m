@@ -16,6 +16,12 @@
 
 - (void)showGrid:(BOOL)animated {
 
+    // 外部调用入口：先确保视图与网格前置条件就绪，避免静默失败或空白网格。
+    // Public entry point: prepare the view and grid prerequisites first, so the call
+    // never fails silently or shows an empty grid.
+    [self loadViewIfNeeded];
+    if (!self.enableGrid) return;
+    if (_gridTransitioning) return;
     if (_gridController) return;
     _gridTransitioning = YES;
 
