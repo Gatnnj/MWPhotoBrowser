@@ -104,33 +104,36 @@
         return;
     }
 
-    // 释放当前页 ±1 之外的大图
-    NSUInteger i;
-    if (index > 0) {
-        for (i = 0; i < index-1; i++) {
-            id photo = [_photos objectAtIndex:i];
-            if (photo != [NSNull null]) {
-                [photo unloadUnderlyingImage];
-                [_photos replaceObjectAtIndex:i withObject:[NSNull null]];
-                MWLog(@"Released underlying image at index %lu", (unsigned long)i);
-            }
-        }
+    // 只保留当前页与本次内存预算允许的邻页大图，其余页及时取消并释放。
+    NSUInteger photoCount = [self numberOfPhotos];
+    NSUInteger preloadCount = [self adjacentPhotoPreloadCount];
+    NSUInteger firstKeptIndex = index > preloadCount ? index - preloadCount : 0;
+    NSUInteger lastKeptIndex = MIN(index + preloadCount, photoCount - 1);
+
+    for (NSUInteger i = 0; i < firstKeptIndex; i++) {
+        id photo = [_photos objectAtIndex:i];
+        if (photo == [NSNull null]) continue;
+        // 仍绑定在可见页上的图片不取消加载：可见页没有重试入口，
+        // 取消在途加载会让该页停在加载指示器，等页面回收后再释放。
+        if ([self pageDisplayingPhoto:photo] != nil) continue;
+        [photo unloadUnderlyingImage];
+        [_photos replaceObjectAtIndex:i withObject:[NSNull null]];
+        MWLog(@"Released underlying image at index %lu", (unsigned long)i);
     }
-    if (index < [self numberOfPhotos] - 1) {
-        for (i = index + 2; i < _photos.count; i++) {
-            id photo = [_photos objectAtIndex:i];
-            if (photo != [NSNull null]) {
-                [photo unloadUnderlyingImage];
-                [_photos replaceObjectAtIndex:i withObject:[NSNull null]];
-                MWLog(@"Released underlying image at index %lu", (unsigned long)i);
-            }
-        }
+    for (NSUInteger i = lastKeptIndex + 1; i < _photos.count; i++) {
+        id photo = [_photos objectAtIndex:i];
+        if (photo == [NSNull null]) continue;
+        if ([self pageDisplayingPhoto:photo] != nil) continue;
+        [photo unloadUnderlyingImage];
+        [_photos replaceObjectAtIndex:i withObject:[NSNull null]];
+        MWLog(@"Released underlying image at index %lu", (unsigned long)i);
     }
 
-    // 当前图已就绪时预加载相邻页（后台加载完成后也会回调到此）
+    // 当前图已就绪时预加载相邻页（后台加载完成后也会回调到此）；
+    // 复用本次采样的档位，避免释放窗口与预载窗口读数不一致。
     id <MWPhoto> currentPhoto = [self photoAtIndex:index];
     if ([currentPhoto underlyingImage]) {
-        [self loadAdjacentPhotosIfNecessary:currentPhoto];
+        [self loadAdjacentPhotosIfNecessary:currentPhoto preloadCount:preloadCount];
     }
 
     // 页码变化时通知代理

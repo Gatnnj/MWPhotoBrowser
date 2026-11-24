@@ -179,6 +179,10 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
     self.collectionView.alwaysBounceVertical = YES;
     [self.collectionView registerClass:[MWWaterfallCell class]
             forCellWithReuseIdentifier:kMWWaterfallCellReuseID];
+    
+    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
+
+    }];
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -211,10 +215,6 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 #pragma mark - UICollectionViewDelegate
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    //    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
-    //
-    //    }];
-    
     // 数据数组
     NSArray<NSString *> *tmpArray = @[
         @"https://picsum.photos/id/1015/3840/2560",

@@ -77,6 +77,10 @@ NS_ASSUME_NONNULL_BEGIN
     BOOL _didSavePreviousStateOfNavBar;
     BOOL _skipNextPagingScrollViewPositioning;
     BOOL _viewHasAppearedInitially;
+
+    // 预加载调度：档位缓存（滞回）与内存警告冷却截止时间
+    NSUInteger _preloadCountCache;
+    NSTimeInterval _preloadSuppressedUntil;
 }
 
 /// 拖拽关闭交互控制器，仅在启用自定义转场时创建。
@@ -142,8 +146,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable id<MWPhoto>)thumbPhotoAtIndex:(NSUInteger)index;
 /// 取图片对象当前已就绪的 UIImage
 - (nullable UIImage *)imageForPhoto:(id<MWPhoto>)photo;
-/// 预加载当前页相邻的图片
+/// 返回当前进程内存预算允许的每侧预加载页数（0 到 2）。
+- (NSUInteger)adjacentPhotoPreloadCount;
+/// 按内存预算预加载当前页相邻图片。
 - (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo;
+/// 同上方方法，使用调用方已采样的档位，避免一次翻页内重复读数导致窗口不一致。
+- (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo preloadCount:(NSUInteger)preloadCount;
 /// 释放所有图片底层数据，可保留当前页
 - (void)releaseAllUnderlyingPhotos:(BOOL)preserveCurrent;
 /// 处理图片加载完成通知，刷新对应页

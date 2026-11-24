@@ -77,6 +77,8 @@
     _recycledPages = [[NSMutableSet alloc] init];
     _photos = [[NSMutableArray alloc] init];
     _thumbPhotos = [[NSMutableArray alloc] init];
+    _preloadCountCache = 0;
+    _preloadSuppressedUntil = 0;
     _didSavePreviousStateOfNavBar = NO;
 
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -97,6 +99,10 @@
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
+    // 冷却期内停止预载并清零档位缓存：内存警告后 available 读数常立刻回高，
+    // 若沿用旧档位会在下一次翻页立刻重新填满，抵消本次释放。
+    _preloadSuppressedUntil = CACurrentMediaTime() + 15.0;
+    _preloadCountCache = 0;
     [self releaseAllUnderlyingPhotos:YES];
     [_recycledPages removeAllObjects];
 }
