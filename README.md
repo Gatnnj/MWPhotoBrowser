@@ -56,7 +56,7 @@ dependencies: [
 ]
 ```
 
-最低支持 **iOS 13.0**，SDWebImage 依赖（≥ 5.21.7）自动解析。SPM 侧资源包名为 `MWPhotoBrowser_MWPhotoBrowser.bundle`，库内已自动识别，无需额外配置。
+最低支持 **iOS 15.0**，SDWebImage 依赖（≥ 5.21.7）自动解析。SPM 侧资源包名为 `MWPhotoBrowser_MWPhotoBrowser.bundle`，库内已自动识别，无需额外配置。
 
 
 ## Usage

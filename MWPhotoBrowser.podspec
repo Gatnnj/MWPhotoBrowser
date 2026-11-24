@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
     :git => 'https://github.com/Gatnnj/MWPhotoBrowser.git',
     :tag => s.version.to_s
   }
-  s.platform = :ios, '13.0'
+  s.platform = :ios, '15.0'
   s.source_files = 'Pod/Classes/**/*'
   # 与 Package.swift 共用同一份源码与资源；SPM 侧产物为 MWPhotoBrowser_MWPhotoBrowser.bundle
   # 图标统一收进 asset catalog：打包时由 actool 编译进 MWPhotoBrowser.bundle 的 Assets.car。
@@ -28,9 +28,6 @@ Pod::Spec.new do |s|
     'MWPhotoBrowser' => ['Pod/Assets/*.xcassets']
   }
   s.requires_arc = true
-
-  # AssetsLibrary、MediaPlayer 已移除（iOS 9 废弃）；视频能力已下线，
-  # 因此不再声明 AVKit / AVFoundation，仅保留图片链路所需的框架
   s.frameworks = 'ImageIO', 'QuartzCore', 'Photos'
 
   # SDWebImage

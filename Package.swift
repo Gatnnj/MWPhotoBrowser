@@ -16,7 +16,7 @@ import PackageDescription
 let package = Package(
     name: "MWPhotoBrowser",
     platforms: [
-        .iOS(.v13)
+        .iOS(.v15)
     ],
     products: [
         .library(name: "MWPhotoBrowser", targets: ["MWPhotoBrowser"])
