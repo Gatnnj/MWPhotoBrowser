@@ -9,7 +9,6 @@
 #import "MWGridViewController.h"
 #import "MWGridCell.h"
 #import "MWPhotoBrowserPrivate.h"
-#import "MWCommon.h"
 
 @interface MWGridViewController () {
     

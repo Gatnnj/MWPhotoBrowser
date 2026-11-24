@@ -5,7 +5,6 @@
 //  分页管理：可见页计算、页面复用、页面切换回调、UIScrollView 代理
 //
 
-#import "MWCommon.h"
 #import "MWPhotoBrowser.h"
 #import "MWPhotoBrowserPrivate.h"
 

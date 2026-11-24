@@ -11,7 +11,6 @@
 #import "SDWebImage.h"
 #endif
 #import "MWPhotoBrowser.h"
-#import "MWCommon.h"
 
 #import "YBImageBrowser/YBImageBrowser.h"
 

@@ -8,7 +8,6 @@
 
 #import "MWCircularProgressView.h"
 #import "MWGridCell.h"
-#import "MWCommon.h"
 #import "MWPhotoBrowserPrivate.h"
 #import "UIImage+MWPhotoBrowser.h"
 

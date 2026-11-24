@@ -5,7 +5,6 @@
 //  数据源与图片加载：照片取数、缓存、相邻预加载、底层图片释放、加载完成通知
 //
 
-#import "MWCommon.h"
 #import "MWPhotoBrowser.h"
 #import "MWPhotoBrowserPrivate.h"
 #import "MWPhotoInteractiveTransition.h"

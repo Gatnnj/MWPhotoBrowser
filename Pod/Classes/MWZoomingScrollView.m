@@ -7,7 +7,6 @@
 //
 
 #import "MWCircularProgressView.h"
-#import "MWCommon.h"
 #import "MWZoomingScrollView.h"
 #import "MWPhotoBrowser.h"
 #import "MWPhoto.h"
