@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
 
   s.name = 'MWPhotoBrowser'
-  s.version = '3.1.0'
+  s.version = '3.2.0'
   s.license = 'MIT'
   s.summary = 'A simple iOS photo browser with optional grid view, captions and selections.'
   s.description = <<-DESCRIPTION
