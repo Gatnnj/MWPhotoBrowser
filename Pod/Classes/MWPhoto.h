@@ -9,6 +9,7 @@
 #import <Foundation/Foundation.h>
 #import <Photos/Photos.h>
 #import "MWPhotoProtocol.h"
+#import "MWPhotoImageLoader.h"
 
 
 NS_ASSUME_NONNULL_BEGIN
@@ -39,6 +40,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)clearBlurCacheForURL:(NSURL *)url;
 /// 异步清空某个 URL 的模糊文件，完成后在主线程回调
 + (void)clearBlurCacheForURL:(NSURL *)url completion:(nullable void (^)(void))completion;
+
+/// 返回 URL 图片加载器。默认返回 MWPhotoSDWebImageLoader；子类可重写以接入自有网络/缓存库。
+/// 加载器须支持取消，并可在任意队列回调；MWPhoto 会负责主线程状态更新。子类应返回可复用的稳定实例。
+- (id<MWPhotoImageLoader>)imageLoader;
 
 /// 初始化（无图片，供子类使用）
 - (instancetype)init;

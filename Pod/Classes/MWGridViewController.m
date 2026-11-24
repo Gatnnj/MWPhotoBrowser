@@ -24,7 +24,7 @@
 
 @implementation MWGridViewController
 
-- (id)init {
+- (instancetype)init {
     if ((self = [super initWithCollectionViewLayout:[UICollectionViewFlowLayout new]])) {
         
         // 默认列数与边距

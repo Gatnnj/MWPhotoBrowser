@@ -25,7 +25,7 @@
 
 @implementation MWGridCell
 
-- (id)initWithFrame:(CGRect)frame {
+- (instancetype)initWithFrame:(CGRect)frame {
     if ((self = [super initWithFrame:frame])) {
 
         // 灰色背景

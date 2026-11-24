@@ -6,13 +6,6 @@
 //  Copyright 2010 d3i. All rights reserved.
 //
 
-#if __has_include(<SDWebImage/SDWebImage.h>)
-#import <SDWebImage/SDWebImage.h>
-#else
-#import "SDWebImage.h"
-#endif
-
-
 #import <Photos/Photos.h>
 #import <ImageIO/ImageIO.h>
 #import <math.h>
@@ -24,8 +17,8 @@
 @interface MWPhoto () {
 
     BOOL _loadingInProgress;
-    id <SDWebImageOperation> _webImageOperation;
-    id <SDWebImageOperation> _gridWebImageOperation;
+    id<MWPhotoImageLoadingOperation> _webImageOperation;
+    id<MWPhotoImageLoadingOperation> _gridWebImageOperation;
     PHImageRequestID _assetRequestID;
     NSUInteger _loadGeneration;
     NSUInteger _gridLoadGeneration;
@@ -41,17 +34,25 @@
 @property (nonatomic) CGSize assetTargetSize;
 @property (nonatomic, strong) UIImage *sourceImage;
 @property (nonatomic, strong) UIImage *gridThumbnailImage;
+@property (nonatomic, strong) id<MWPhotoImageLoader> configuredImageLoader;
 - (void)imageLoadingComplete;
 - (void)completeLoadingWithImage:(UIImage *)image generation:(NSUInteger)generation;
 - (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation;
 - (void)finishLoadingSourceImage:(UIImage *)image generation:(NSUInteger)generation;
-- (void)removeSDWebImageMemoryCacheEntries;
+- (void)removeImageLoaderMemoryCacheEntries;
 
 @end
 
 @implementation MWPhoto
 
 @synthesize underlyingImage = _underlyingImage; // synth property from protocol
+
+- (id<MWPhotoImageLoader>)imageLoader {
+    if (!self.configuredImageLoader) {
+        self.configuredImageLoader = [MWPhotoSDWebImageLoader new];
+    }
+    return self.configuredImageLoader;
+}
 
 #pragma mark - Class Methods
 
@@ -235,47 +236,45 @@
     _gridThumbnailLoading = YES;
     NSUInteger generation = ++_gridLoadGeneration;
     _gridThumbnailPixelSize = pixelSize;
-    SDWebImageContext *context = @{
-        SDWebImageContextImageThumbnailPixelSize: [NSValue valueWithCGSize:pixelSize],
-        // 解码缩略图不入 SDWebImage 内存缓存，压缩原图与缩略图变体留在磁盘复用
-        SDWebImageContextStoreCacheType: @(SDImageCacheTypeDisk)
-    };
     __weak typeof(self) weakSelf = self;
-    _gridWebImageOperation = [[SDWebImageManager sharedManager] loadImageWithURL:_photoURL
-                                                                           options:0
-                                                                          context:context
-                                                                         progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
+    _gridWebImageOperation = [self.imageLoader loadImageAtURL:_photoURL
+                                           thumbnailPixelSize:pixelSize
+                                                     progress:^(CGFloat progress) {
         MWPhoto *photo = weakSelf;
-        if (!photo || expectedSize <= 0) return;
-        float progress = receivedSize / (float)expectedSize;
-        NSDictionary *info = @{@"progress": @(progress), @"photo": photo};
-        [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:info];
-    } completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
-        if (!finished) return;
+        if (!photo) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSDictionary *info = @{ @"progress": @(progress), @"photo": photo };
+            [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:info];
+        });
+    } completion:^(UIImage * _Nullable image, NSError * _Nullable error) {
         MWPhoto *photo = weakSelf;
-        if (!photo || generation != photo->_gridLoadGeneration) return;
-        photo->_gridWebImageOperation = nil;
+        if (!photo) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (generation != photo->_gridLoadGeneration) return;
+            photo->_gridWebImageOperation = nil;
+            if (error) MWLog(@"Image loader failed to load thumbnail: %@", error);
 
-        void (^finish)(UIImage *) = ^(UIImage *gridImage) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (generation != photo->_gridLoadGeneration) return;
-                photo->_gridThumbnailLoading = NO;
-                if (photo->_gridThumbnailDemanded) {
-                    photo.gridThumbnailImage = gridImage;
-                    [photo postCompleteNotification];
-                }
-            });
-        };
-        if (image && photo.isBlur) {
-            CGFloat blurRadius = MAX(2, MIN(photo.radius, MAX(pixelSize.width, pixelSize.height) / 16.0));
-            dispatch_async(MWPhotoBlurQueue(), ^{
-                @autoreleasepool {
-                    finish([UIImage gaussianBlurWithImage:image ofRadius:blurRadius] ?: image);
-                }
-            });
-        } else {
-            finish(image);
-        }
+            void (^finish)(UIImage *) = ^(UIImage *gridImage) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (generation != photo->_gridLoadGeneration) return;
+                    photo->_gridThumbnailLoading = NO;
+                    if (photo->_gridThumbnailDemanded) {
+                        photo.gridThumbnailImage = gridImage;
+                        [photo postCompleteNotification];
+                    }
+                });
+            };
+            if (image && photo.isBlur) {
+                CGFloat blurRadius = MAX(2, MIN(photo.radius, MAX(pixelSize.width, pixelSize.height) / 16.0));
+                dispatch_async(MWPhotoBlurQueue(), ^{
+                    @autoreleasepool {
+                        finish([UIImage gaussianBlurWithImage:image ofRadius:blurRadius] ?: image);
+                    }
+                });
+            } else {
+                finish(image);
+            }
+        });
     }];
 }
 
@@ -306,7 +305,7 @@
 
         } else {
 
-            // 网络 URL：SDWebImage 异步下载
+            // 网络 URL：通过可替换的图片加载器异步加载
             [self _performLoadUnderlyingImageAndNotifyWithWebURL: _photoURL];
 
         }
@@ -324,30 +323,30 @@
     }
 }
 
-/// 网络 URL：走 SDWebImage 异步下载，进度与完成分别发通知
+/// 网络 URL：通过图片加载器异步加载，进度与完成分别发通知
 - (void)_performLoadUnderlyingImageAndNotifyWithWebURL:(NSURL *)url {
     NSUInteger generation = _loadGeneration;
     @try {
-        SDWebImageManager *manager = [SDWebImageManager sharedManager];
-        _webImageOperation = [manager loadImageWithURL:url options:0 progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
-            if (expectedSize > 0) {
-                float progress = receivedSize / (float)expectedSize;
-                NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys:
-                                      [NSNumber numberWithFloat:progress], @"progress",
-                                      self, @"photo", nil];
-                [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:dict];
-            }
-        } completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
-            if (error) {
-                MWLog(@"SDWebImage failed to download image: %@", error);
-            }
-            if (!finished) return;
-            // 显式 self 表明 block 有意引用，消除隐式 retain 警告（该 block 为一次性回调，无循环引用）
-            self->_webImageOperation = nil;
-            [self completeLoadingWithImage:image generation:generation];
+        __weak typeof(self) weakSelf = self;
+        _webImageOperation = [self.imageLoader loadImageAtURL:url
+                                           thumbnailPixelSize:CGSizeZero
+                                                     progress:^(CGFloat progress) {
+            MWPhoto *photo = weakSelf;
+            if (!photo) return;
+            NSDictionary *info = @{ @"progress": @(progress), @"photo": photo };
+            [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:info];
+        } completion:^(UIImage * _Nullable image, NSError * _Nullable error) {
+            MWPhoto *photo = weakSelf;
+            if (!photo) return;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (generation != photo->_loadGeneration) return;
+                photo->_webImageOperation = nil;
+                if (error) MWLog(@"Image loader failed to download image: %@", error);
+                [photo completeLoadingWithImage:image generation:generation];
+            });
         }];
-    } @catch (NSException *e) {
-        MWLog(@"Photo from web: %@", e);
+    } @catch (NSException *exception) {
+        MWLog(@"Photo from web: %@", exception);
         _webImageOperation = nil;
         [self imageLoadingComplete];
     }
@@ -489,31 +488,17 @@
 /// 释放底层数据：取消加载并清内存，可从路径/URL 重新加载
 - (void)unloadUnderlyingImage {
 	[self cancelAnyLoading];
-	[self removeSDWebImageMemoryCacheEntries];
+	[self removeImageLoaderMemoryCacheEntries];
 	self.sourceImage = nil;
 	self.gridThumbnailImage = nil;
 	self.underlyingImage = nil;
 }
 
-/// 清掉 SDWebImage 内存缓存中的原图与缩略图条目，避免常驻占内存
-- (void)removeSDWebImageMemoryCacheEntries {
+/// 请求图片加载器清理 URL 图片对应的内存缓存（若加载器支持）。
+- (void)removeImageLoaderMemoryCacheEntries {
     if (!_photoURL) return;
-
-    SDWebImageManager *manager = [SDWebImageManager sharedManager];
-    id<SDImageCache> imageCache = manager.imageCache;
-    NSString *originalKey = [manager cacheKeyForURL:_photoURL context:nil];
-    if (originalKey.length) {
-        [imageCache removeImageForKey:originalKey cacheType:SDImageCacheTypeMemory completion:nil];
-    }
-
-    if (_gridThumbnailPixelSize.width > 0 && _gridThumbnailPixelSize.height > 0) {
-        SDWebImageContext *context = @{
-            SDWebImageContextImageThumbnailPixelSize: [NSValue valueWithCGSize:_gridThumbnailPixelSize]
-        };
-        NSString *thumbnailKey = [manager cacheKeyForURL:_photoURL context:context];
-        if (thumbnailKey.length) {
-            [imageCache removeImageForKey:thumbnailKey cacheType:SDImageCacheTypeMemory completion:nil];
-        }
+    if ([self.imageLoader respondsToSelector:@selector(removeMemoryCacheForURL:thumbnailPixelSize:)]) {
+        [self.imageLoader removeMemoryCacheForURL:_photoURL thumbnailPixelSize:_gridThumbnailPixelSize];
     }
 }
 
