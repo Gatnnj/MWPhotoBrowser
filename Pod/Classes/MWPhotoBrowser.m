@@ -23,22 +23,28 @@
 
 #pragma mark - Initialization
 
-- (instancetype)init {
-    if ((self = [super init])) {
+// 指定初始化方法：与 UIViewController 的 initWithNibName:bundle: 对齐，
+// 其余 init 均为 convenience，通过 self 链转发到这里，保证 OC/Swift 子类自定义 init 有统一的 super 入口。
+- (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
+    if ((self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil])) {
         [self commonInit];
     }
     return self;
 }
 
+- (instancetype)init {
+    return [self initWithNibName:nil bundle:nil];
+}
+
 - (instancetype)initWithDelegate:(id <MWPhotoBrowserDelegate>)delegate {
-    if ((self = [self init])) {
+    if ((self = [self initWithNibName:nil bundle:nil])) {
         _delegate = delegate;
     }
     return self;
 }
 
 - (instancetype)initWithPhotos:(NSArray<id<MWPhoto>> *)photosArray {
-    if ((self = [self init])) {
+    if ((self = [self initWithNibName:nil bundle:nil])) {
         _fixedPhotosArray = photosArray;
     }
     return self;

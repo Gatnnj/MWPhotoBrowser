@@ -196,6 +196,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - Initialization
 
+/// 指定初始化方法：与 UIViewController 的 initWithNibName:bundle: 对齐。
+/// Swift 子类新增自定义 init 时，应通过本方法调用 super。
+- (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil NS_DESIGNATED_INITIALIZER;
+
+/// Storyboard / NSCoder 解码初始化，属 required 指定初始化方法。
+- (nullable instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
+
 /// 使用固定图片数组初始化，无需实现数据源代理。
 /// Initializes with a fixed photo array; no data source delegate is required.
 /// @param photosArray 图片对象数组 / Array of photo objects.
