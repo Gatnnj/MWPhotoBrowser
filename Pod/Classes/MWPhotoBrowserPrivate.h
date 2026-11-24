@@ -55,6 +55,8 @@ NS_ASSUME_NONNULL_BEGIN
     UIBarButtonItem *_gridPreviousLeftNavItem;
     UIPanGestureRecognizer *_gridDismissPanGesture;
     BOOL _gridTransitioning;
+    BOOL _isShowingGrid;
+    BOOL _hasPickedFromGrid;
     BOOL _pendingReloadData;
 
     // 外观 / Appearance
@@ -79,12 +81,16 @@ NS_ASSUME_NONNULL_BEGIN
     BOOL _didSavePreviousStateOfNavBar;
     BOOL _skipNextPagingScrollViewPositioning;
     BOOL _viewHasAppearedInitially;
-    CGPoint _currentGridContentOffset;
 }
 
 /// 拖拽关闭交互控制器，仅在启用自定义转场时创建。
 /// Drag-to-dismiss interaction controller, created only when the custom transition is enabled.
 @property (nonatomic, strong, nullable) MWPhotoInteractiveTransition *interactiveTransition;
+
+/// 网格状态的内部可写版本：公开头对外只读，由网格流程与选中回调写入。
+/// Internal read-write accessors for the grid state exposed read-only in the public header.
+@property (nonatomic, readwrite) BOOL hasPickedFromGrid;
+@property (nonatomic, readwrite) BOOL isShowingGrid;
 
 // 由主实现提供 / Provided by the main implementation
 - (void)performLayout;

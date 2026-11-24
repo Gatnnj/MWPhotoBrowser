@@ -217,7 +217,7 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
     //    }];
     
     // 数据数组
-    NSArray<NSString *> *urls = @[
+    NSArray<NSString *> *tmpArray = @[
         @"https://picsum.photos/id/1015/3840/2560",
         @"https://picsum.photos/id/1016/3840/2560",
         @"https://picsum.photos/id/1020/3840/2560",
@@ -234,6 +234,11 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
         @"https://picsum.photos/id/1039/2560/3840",
         @"https://picsum.photos/id/1023/3000/3000",
     ];
+    
+    NSMutableArray *urls = [NSMutableArray arrayWithArray:tmpArray];
+    [urls addObjectsFromArray:[tmpArray copy]];
+    [urls addObjectsFromArray:[tmpArray copy]];
+    [urls addObjectsFromArray:[tmpArray copy]];
     
     MWWaterfallCell *cell = (MWWaterfallCell *)[collectionView cellForItemAtIndexPath:indexPath];
     if (cell.imageView.image == nil) {

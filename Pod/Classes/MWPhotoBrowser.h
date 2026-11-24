@@ -144,9 +144,16 @@ NS_ASSUME_NONNULL_BEGIN
 /// Applied at view load time. Use customToolBarItems: and related methods to adjust the toolbar afterwards.
 @property (nonatomic) BOOL isHiddenToolBar;
 
-/// 网格视图是否正在显示的状态标记，由网格控制器维护。
-/// State flag indicating whether the grid view is showing. Maintained by the grid controller.
-@property (nonatomic) BOOL isShowGriding;
+/// 是否曾在网格视图中点选过照片。首次点选即置为 YES，之后不再复位，不代表网格当前是否展示。
+/// Whether the user has ever picked a photo from the grid. Set to YES on the first pick and never reset.
+/// @discussion 用于区分"从未通过网格选图"与"选过图"；判断网格当前是否正在展示请使用 isShowingGrid。
+/// Distinguishes "never picked from the grid" from "has picked". To know whether the grid is
+/// currently on screen, use isShowingGrid instead.
+@property (nonatomic, readonly) BOOL hasPickedFromGrid;
+
+/// 网格视图当前是否正在展示。展示时为 YES，关闭后为 NO，仅供外部读取。
+/// Whether the grid view is currently presented. YES while shown, NO once it is closed. Read-only.
+@property (nonatomic, readonly) BOOL isShowingGrid;
 
 /// 是否启用自定义丝滑转场（连贯放大进入 + 拖拽关闭）。默认 NO，保持原有行为。
 /// Whether to enable the custom smooth transition (coherent zoom-in plus drag-to-dismiss). Defaults to NO.

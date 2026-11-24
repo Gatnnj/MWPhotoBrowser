@@ -24,12 +24,10 @@
     if (_gridTransitioning) return;
     if (_gridController) return;
     _gridTransitioning = YES;
+    _isShowingGrid = YES;
 
     // Init grid controller
     _gridController = [[MWGridViewController alloc] init];
-    // 每次重新展示都从网格顶部开始，避免继承上次浏览位置。
-    _currentGridContentOffset = CGPointZero;
-    _gridController.initialContentOffset = _currentGridContentOffset;
     _gridController.browser = self;
     _gridController.view.frame = self.view.bounds;
     _gridController.view.frame = CGRectOffset(_gridController.view.frame, 0, (self.startOnGrid ? -1 : 1) * self.view.bounds.size.height);
@@ -93,6 +91,7 @@
         _gridDismissPanGesture = nil;
     }
     _gridController = nil;
+    _isShowingGrid = NO;
 
     // Update
     [self updateNavigation];

@@ -18,6 +18,7 @@
     UIImageView *_imageView;
     UIImageView *_loadingError;
 	UIView *_loadingIndicator;
+    UIView *_currentPhotoOverlay;
     
 }
 
@@ -38,7 +39,25 @@
         _imageView.clipsToBounds = YES;
         _imageView.autoresizesSubviews = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
         [self addSubview:_imageView];
-        
+
+        // 当前大图对应的格子：白色细描边 + 极轻的外发光，柔和地"点亮"这一格。
+        // 只用 layer 绘制，不额外加载图片，也不压暗缩略图本身。
+        // Marker for the photo currently shown in the pager: thin white stroke plus a very
+        // light outer glow, so the cell reads as "highlighted" without dimming the thumbnail.
+        _currentPhotoOverlay = [UIView new];
+        _currentPhotoOverlay.userInteractionEnabled = NO;
+        _currentPhotoOverlay.backgroundColor = [UIColor clearColor];
+        _currentPhotoOverlay.hidden = YES;
+        CALayer *overlayLayer = _currentPhotoOverlay.layer;
+        overlayLayer.cornerRadius = 2.0;
+        overlayLayer.borderWidth = 1.0;
+        overlayLayer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.6].CGColor;
+        overlayLayer.shadowColor = [UIColor whiteColor].CGColor;
+        overlayLayer.shadowOpacity = 0.15;
+        overlayLayer.shadowRadius = 2.0;
+        overlayLayer.shadowOffset = CGSizeZero;
+        [self addSubview:_currentPhotoOverlay];
+
         
 		// Loading indicator
         // Listen for photo loading notifications
@@ -86,6 +105,10 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
     _imageView.frame = self.bounds;
+    _currentPhotoOverlay.frame = self.bounds;
+    // 固定 shadowPath，避免阴影每次都触发离屏渲染。
+    // Cache the shadow path so the glow never needs offscreen rendering.
+    _currentPhotoOverlay.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:_currentPhotoOverlay.bounds cornerRadius:2.0].CGPath;
     _loadingIndicator.frame = CGRectMake(floorf((self.bounds.size.width - _loadingIndicator.frame.size.width) / 2.),
                                          floorf((self.bounds.size.height - _loadingIndicator.frame.size.height) / 2),
                                          _loadingIndicator.frame.size.width,
@@ -98,11 +121,21 @@
     _photo = nil;
     _gridController = nil;
     _imageView.image = nil;
+    _isCurrentPhoto = NO;
+    _currentPhotoOverlay.hidden = YES;
     if ([_loadingIndicator respondsToSelector:@selector(setProgress:)]) {
         [(id<MWPhotoBrowserLoadingView>)_loadingIndicator setProgress:0];
     }
     [self hideImageFailure];
     [super prepareForReuse];
+}
+
+#pragma mark - Current Photo Marker
+
+- (void)setIsCurrentPhoto:(BOOL)isCurrentPhoto {
+    if (_isCurrentPhoto == isCurrentPhoto) return;
+    _isCurrentPhoto = isCurrentPhoto;
+    _currentPhotoOverlay.hidden = !isCurrentPhoto;
 }
 
 #pragma mark - Image Handling

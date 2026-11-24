@@ -34,12 +34,10 @@
     self.selectedIndex = 0;
 
     // iOS 15+ 默认透明 TabBar 会让列表内容透上来，这里固定为不透明背景
-    if (@available(iOS 15.0, *)) {
-        UITabBarAppearance *appearance = [[UITabBarAppearance alloc] init];
-        [appearance configureWithDefaultBackground];
-        self.tabBar.standardAppearance = appearance;
-        self.tabBar.scrollEdgeAppearance = appearance;
-    }
+    UITabBarAppearance *appearance = [[UITabBarAppearance alloc] init];
+    [appearance configureWithDefaultBackground];
+    self.tabBar.standardAppearance = appearance;
+    self.tabBar.scrollEdgeAppearance = appearance;
 }
 
 @end

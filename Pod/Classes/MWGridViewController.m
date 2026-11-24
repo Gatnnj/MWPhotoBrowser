@@ -16,6 +16,9 @@
     // Store margins for current setup
     CGFloat _margin, _gutter, _marginL, _gutterL, _columns, _columnsL;
     
+    // Initial position already applied for this grid instance; prevents repeated reapplication.
+    BOOL _didApplyInitialPosition;
+    
 }
 
 @end
@@ -43,9 +46,6 @@
             _margin = 0; _gutter = 1;
             _marginL = 0; _gutterL = 2;
         }
-
-        _initialContentOffset = CGPointMake(0, CGFLOAT_MAX);
- 
     }
     return self;
 }
@@ -86,32 +86,24 @@
 }
 
 - (void)adjustOffsetsAsRequired {
-    BOOL hasInitialContentOffset = _initialContentOffset.y != CGFLOAT_MAX;
+    // 每个网格实例只定位一次：布局回调可能多次触发，重复居中会把用户手动滚动的位置拽回去。
+    // Position the current photo once per grid instance; repeated layout passes must not
+    // yank the content back while the user is scrolling.
+    if (_didApplyInitialPosition) return;
+    if (_browser.numberOfPhotos == 0) return;
+    _didApplyInitialPosition = YES;
 
-    // Move to the requested content offset before checking selected-photo visibility.
-    if (hasInitialContentOffset) {
-        self.collectionView.contentOffset = _initialContentOffset;
-        [self.collectionView layoutIfNeeded]; // Layout after content offset change
-    }
-    
-    // Check if current item is visible and if not, make it so!
-    // When the caller explicitly requested a position (MWPhotoBrowser resets
-    // the grid to the top for each presentation), do not scroll away from it.
-    if (!hasInitialContentOffset && _browser.numberOfPhotos > 0) {
-        NSIndexPath *currentPhotoIndexPath = [NSIndexPath indexPathForItem:_browser.currentIndex inSection:0];
-        NSArray *visibleIndexPaths = [self.collectionView indexPathsForVisibleItems];
-        BOOL currentVisible = NO;
-        for (NSIndexPath *indexPath in visibleIndexPaths) {
-            if ([indexPath isEqual:currentPhotoIndexPath]) {
-                currentVisible = YES;
-                break;
-            }
-        }
-        if (!currentVisible) {
-            [self.collectionView scrollToItemAtIndexPath:currentPhotoIndexPath atScrollPosition:UICollectionViewScrollPositionNone animated:NO];
-        }
-    }
-    
+    if (_browser.currentIndex >= _browser.numberOfPhotos) return;
+
+    // 把当前大图对应的格子居中显示。CenteredVertically 会把偏移量夹到合法区间，
+    // 所以当前照片位于首行、或内容不足一屏时，结果自然停在顶部，不会出现上方留白。
+    // Center the cell of the photo currently shown in the pager. UICollectionView clamps
+    // the offset, so a photo in the first rows (or content shorter than one screen) stays
+    // at the top rather than leaving blank space above.
+    NSIndexPath *currentPhotoIndexPath = [NSIndexPath indexPathForItem:_browser.currentIndex inSection:0];
+    [self.collectionView scrollToItemAtIndexPath:currentPhotoIndexPath
+                               atScrollPosition:UICollectionViewScrollPositionCenteredVertically
+                                       animated:NO];
 }
 
 - (void)performLayout {
@@ -181,6 +173,9 @@
     cell.gridController = self;
     cell.photo = photo;
     cell.index = indexPath.row;
+    // 标记当前大图对应的那一格，打开网格时用户一眼能看到自己正在看哪张。
+    // Mark the cell matching the photo currently shown in the pager.
+    cell.isCurrentPhoto = (indexPath.row == _browser.currentIndex);
     if ([photo respondsToSelector:@selector(loadGridThumbnailAndNotifyWithPixelSize:)]) {
         UIImage *thumbnail = [photo respondsToSelector:@selector(gridThumbnailImage)] ? photo.gridThumbnailImage : nil;
         if (thumbnail) {
@@ -206,7 +201,9 @@
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    _browser.isShowGriding = YES;
+    // 记录"曾经从网格中点选过照片"：只置 YES，永不复位。
+    // Record that the user has picked a photo from the grid: set once, never reset.
+    _browser.hasPickedFromGrid = YES;
     [_browser setCurrentPhotoIndex:indexPath.row];
     [_browser hideGrid];
 }
