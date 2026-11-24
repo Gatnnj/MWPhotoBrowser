@@ -17,9 +17,7 @@
 
 - (void)reloadData {
 
-    // Rebuilding pages while the interactive drag snapshot is on screen can
-    // leave the snapshot over a newly-created page. Coalesce reload requests
-    // until the drag has either restored its source view or finished dismissing.
+    // 拖拽交互期间挂起重载，等快照恢复或关闭完成后再执行，避免新页盖在快照上
     if (self.interactiveTransition.transitionInProgress) {
         _pendingReloadData = YES;
         return;
@@ -28,10 +26,10 @@
     NSUInteger previousIndex = _currentPageIndex;
     MWZoomingScrollView *currentPage = [self pageDisplayedAtIndex:previousIndex];
 
-    // Reset
+    // 重置计数
     _photoCount = NSNotFound;
 
-    // Get data
+    // 取数并清空旧数组，用 NSNull 占位
     NSUInteger numberOfPhotos = [self numberOfPhotos];
     [self releaseAllUnderlyingPhotos:YES];
     [_photos removeAllObjects];
@@ -41,14 +39,14 @@
         [_thumbPhotos addObject:[NSNull null]];
     }
 
-    // Update current page index
+    // 收敛当前页码到合法区间
     if (numberOfPhotos > 0) {
         _currentPageIndex = MAX(0, MIN(_currentPageIndex, numberOfPhotos - 1));
     } else {
         _currentPageIndex = 0;
     }
 
-    // Update layout
+    // 视图已加载时按需保留当前页
     if ([self isViewLoaded]) {
         BOOL canKeepCurrentPage = currentPage && numberOfPhotos > 0 && previousIndex == _currentPageIndex;
         if (canKeepCurrentPage) {
@@ -129,7 +127,7 @@
 
 - (UIImage *)imageForPhoto:(id<MWPhoto>)photo {
     if (photo) {
-        // Get image or obtain in background
+        // 已就绪直接返回，否则触发后台加载
         if ([photo underlyingImage]) {
             return [photo underlyingImage];
         } else {
@@ -142,11 +140,10 @@
 - (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo {
     MWZoomingScrollView *page = [self pageDisplayingPhoto:photo];
     if (page) {
-        // If page is current page then initiate loading of previous and next pages
+        // 仅当前页预加载前后相邻页
         NSUInteger pageIndex = page.index;
         if (_currentPageIndex == pageIndex) {
             if (pageIndex > 0) {
-                // Preload index - 1
                 id <MWPhoto> photo = [self photoAtIndex:pageIndex-1];
                 if (![photo underlyingImage]) {
                     [photo loadUnderlyingImageAndNotify];
@@ -154,7 +151,6 @@
                 }
             }
             if (pageIndex < [self numberOfPhotos] - 1) {
-                // Preload index + 1
                 id <MWPhoto> photo = [self photoAtIndex:pageIndex+1];
                 if (![photo underlyingImage]) {
                     [photo loadUnderlyingImageAndNotify];
@@ -166,18 +162,17 @@
 }
 
 - (void)releaseAllUnderlyingPhotos:(BOOL)preserveCurrent {
-    // Create a copy in case this array is modified while we are looping through
-    // Release photos
+    // 先拷贝数组避免遍历中被修改；释放大图，可保留当前页
     NSArray *copy = [_photos copy];
     for (id p in copy) {
         if (p != [NSNull null]) {
             if (preserveCurrent && p == [self photoAtIndex:self.currentIndex]) {
-                continue; // skip current
+                continue;
             }
             [p unloadUnderlyingImage];
         }
     }
-    // Release thumbs
+    // 释放缩略图
     copy = [_thumbPhotos copy];
     for (id p in copy) {
         if (p != [NSNull null]) {
@@ -191,19 +186,18 @@
     MWZoomingScrollView *page = [self pageDisplayingPhoto:photo];
     if (page) {
         if ([photo underlyingImage]) {
-            // Successful load
+            // 加载成功，刷新页面并预加载相邻
             [page displayImage];
             [self loadAdjacentPhotosIfNecessary:photo];
         } else if ([photo respondsToSelector:@selector(gridThumbnailImage)] && [photo gridThumbnailImage]) {
-            // A grid-only downsample completed. It is not a failed full-size
-            // photo load, so leave the page's full-size loading state alone.
+            // 仅网格缩略图完成，非大图加载失败，保留大图加载态
         } else {
 
-            // Failed to load
+            // 大图加载失败，显示失败占位
             UIImageView *displayedImageView = (UIImageView *)[page photoImageViewForTransition];
             if (!displayedImageView.image) [page displayImageFailure];
         }
-        // Update nav
+        // 更新导航
         [self updateNavigation];
     }
 }

@@ -19,6 +19,7 @@
     else [self mw_present:ctx];
 }
 
+/// 以参考视图的内容样式创建飞行快照 UIImageView
 - (UIImageView *)mw_imageViewWithImage:(UIImage *)image from:(UIView *)reference {
     UIImageView *view = [[UIImageView alloc] initWithImage:image];
     if ([reference isKindOfClass:UIImageView.class]) {
@@ -38,10 +39,12 @@
     return view;
 }
 
+/// 校验入场起点视图与过渡图片是否齐全可用
 - (BOOL)mw_validSourceIn:(UIView *)container {
     return self.startView && self.startView.window && self.transitionImage && self.transitionImage.size.width > 0 && self.transitionImage.size.height > 0 && container.bounds.size.width > 0;
 }
 
+/// 按 aspectFit 计算图片在 bounds 内居中的 frame
 - (CGRect)mw_aspectFitFrameForImage:(UIImage *)image inBounds:(CGRect)bounds {
     if (image.size.width <= 0 || image.size.height <= 0) return CGRectZero;
     CGFloat scale = MIN(CGRectGetWidth(bounds) / image.size.width,
@@ -52,6 +55,7 @@
                       size.width, size.height);
 }
 
+/// 创建铺满容器的黑色背景层，动画期间用于压暗
 - (UIView *)mw_blackBackdropInContainer:(UIView *)container alpha:(CGFloat)alpha {
     UIView *backdrop = [[UIView alloc] initWithFrame:container.bounds];
     backdrop.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -60,6 +64,7 @@
     return backdrop;
 }
 
+/// 入场：缩略图连贯放大到全屏；起点不可用时降级为渐隐
 - (void)mw_present:(id<UIViewControllerContextTransitioning>)ctx {
     UIView *container = ctx.containerView;
     UIViewController *toVC = [ctx viewControllerForKey:UITransitionContextToViewControllerKey];
@@ -79,9 +84,7 @@
     }
 
     CGRect start = [self.startView convertRect:self.startView.bounds toView:container];
-    // YBImageBrowser does not build its image cell until the opening flight
-    // finishes. Keep the presented controller hidden and animate a standalone
-    // thumbnail snapshot to the image's fitted full-screen frame first.
+    // 先隐藏目标控制器，让独立缩略图快照飞到全屏 frame，避免目标 cell 尚未构建
     CGRect end = [self mw_aspectFitFrameForImage:self.transitionImage inBounds:container.bounds];
     UIImageView *moving = [self mw_imageViewWithImage:self.transitionImage from:self.startView];
     moving.frame = start;
@@ -106,6 +109,7 @@
     }];
 }
 
+/// 出场：图片飞回缩略图位置；目标不可用时降级为渐隐
 - (void)mw_dismiss:(id<UIViewControllerContextTransitioning>)ctx {
     UIView *container = ctx.containerView;
     UIViewController *fromVC = [ctx viewControllerForKey:UITransitionContextFromViewControllerKey];
@@ -125,8 +129,7 @@
 
     CGRect start = [source convertRect:source.bounds toView:container];
     CGRect end = [target convertRect:target.bounds toView:container];
-    // YBImageBrowser changes the flying image to the destination thumbnail's
-    // content mode before shrinking it back into that thumbnail.
+    // 缩小飞回前把飞行图换成目标缩略图的内容模式，使其贴合终点
     UIImageView *moving = [self mw_imageViewWithImage:((UIImageView *)source).image from:target];
     moving.frame = start;
     [container addSubview:moving];

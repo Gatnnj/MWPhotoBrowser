@@ -14,6 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface MWTapDetectingImageView : UIImageView {}
 
+/// 手势识别代理（弱引用）
 @property (nonatomic, weak, nullable) id <MWTapDetectingImageViewDelegate> tapDelegate;
 
 @end
@@ -22,8 +23,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @optional
 
+/// 识别到单击
 - (void)imageView:(UIImageView *)imageView singleTapDetected:(UITouch *)touch;
+/// 识别到双击
 - (void)imageView:(UIImageView *)imageView doubleTapDetected:(UITouch *)touch;
+/// 识别到三击
 - (void)imageView:(UIImageView *)imageView tripleTapDetected:(UITouch *)touch;
 
 @end

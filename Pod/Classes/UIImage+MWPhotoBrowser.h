@@ -24,7 +24,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 旧接口，保留以兼容外部调用；已改为按资源名解析，不再依赖 "XXX.bundle/YYY" 这类硬编码路径。
 + (nullable UIImage *)imageForResourcePath:(NSString *)path ofType:(NSString *)type inBundle:(NSBundle *)bundle;
+/// 生成指定尺寸的透明图片（占位/清空用）
 + (UIImage *)clearImageWithSize:(CGSize)size;
+/// 对原图做高斯模糊，返回处理后的新图
 + (UIImage *)gaussianBlurWithImage:(UIImage *)originalImage ofRadius:(CGFloat)radius;
 
 

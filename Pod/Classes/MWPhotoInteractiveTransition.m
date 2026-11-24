@@ -54,6 +54,7 @@
     [rootView addGestureRecognizer:pan];
 }
 
+/// 拖拽手势主处理：按阶段建快照、跟手缩放位移、松手判定回弹或关闭
 - (void)mw_handlePan:(UIPanGestureRecognizer *)pan {
     UIView *root = self.rootView;
     CGPoint translation = [pan translationInView:root];
@@ -69,19 +70,13 @@
             CGPoint touchPoint = [pan locationInView:root];
             CGPoint imageCenter = [image convertPoint:CGPointMake(CGRectGetMidX(image.bounds), CGRectGetMidY(image.bounds)) toView:root];
             self.touchOffset = CGPointMake(touchPoint.x - imageCenter.x, touchPoint.y - imageCenter.y);
-            // UIImageView.snapshotViewAfterScreenUpdates: can produce a blank
-            // snapshot for an image that was just installed by an async loader
-            // (network/blur completion). Build the drag view from the actual
-            // UIImage instead, so the dragged content is independent of the
-            // source view's backing layer and reuse lifecycle.
+            // 异步刚装上的图用 snapshotViewAfterScreenUpdates: 可能得到空白快照，
+            // 故直接取 UIImage 建拖拽视图，与源视图的 backing layer 和复用生命周期解耦
             UIImage *displayedImage = [image isKindOfClass:[UIImageView class]] ? ((UIImageView *)image).image : nil;
             if (!displayedImage) break;
             UIImageView *imageSnapshot = [[UIImageView alloc] initWithImage:displayedImage];
-            // The source image view is zoomed by its enclosing UIScrollView,
-            // so its screen-space frame is smaller than UIImage.size. Reuse
-            // that converted frame as the snapshot's bounds and scale the
-            // bitmap into it; UIViewContentModeCenter would draw at the raw
-            // pixel size and look enlarged/cropped during the drag.
+            // 源视图被外层 scrollView 缩放，屏幕 frame 小于图片原尺寸；复用该 frame 并把位图填进去，
+            // 用 Center 模式会按原像素绘制，拖拽时看起来放大裁切
             imageSnapshot.contentMode = UIViewContentModeScaleToFill;
             imageSnapshot.clipsToBounds = image.clipsToBounds;
             imageSnapshot.backgroundColor = UIColor.clearColor;
@@ -115,8 +110,7 @@
             frame.origin = CGPointMake(centerInWindow.x - frame.size.width * 0.5,
                                        centerInWindow.y - frame.size.height * 0.5);
             self.dragSnapshot.frame = frame;
-            // Match YBImageBrowser: scale and fade symmetrically for either
-            // vertical drag direction.
+            // 两个垂直方向都对称缩放与渐隐
             CGFloat progress = MIN(1, verticalDistance / (height * 0.5));
             CGFloat alpha = pow(1 - progress, 2.0);
             if (self.setBackgroundAlpha) self.setBackgroundAlpha(alpha);
@@ -138,6 +132,7 @@
     }
 }
 
+/// 未达关闭阈值：弹簧回弹到原位并恢复层状态
 - (void)mw_restore {
     UIView *snapshot = self.dragSnapshot;
     if (!snapshot) return;
@@ -157,6 +152,7 @@
     }];
 }
 
+/// 达到关闭阈值：快照飞到目标位、透明度归零后回调关闭
 - (void)mw_finishDismiss {
     UIView *snapshot = self.dragSnapshot;
     UIWindow *window = self.overlayWindow;
@@ -176,8 +172,7 @@
     } completion:^(BOOL finished) {
         [snapshot removeFromSuperview];
         self.dragSnapshot = nil;
-        // Reveal the real cover on the same frame the moving snapshot lands;
-        // the browser is still covering the list until dismissBlock runs.
+        // 快照落位的同帧恢复真实封面；dismissBlock 执行前浏览器仍盖住列表
         target.hidden = self.dismissTargetOriginalHidden;
         self.dismissTargetView = nil;
         if (self.dismissBlock) self.dismissBlock();
@@ -186,9 +181,8 @@
 
 - (BOOL)gestureRecognizerShouldBegin:(UIPanGestureRecognizer *)gesture {
     UIView *image = self.currentImageViewBlock ? self.currentImageViewBlock() : nil;
-    // While a network photo is still loading the page's UIImageView exists but
-    // has no image. Starting the interaction would hide that view and drag a
-    // black placeholder, so wait until real image content is available.
+    // 网络图还在加载时 UIImageView 已存在但无图，此时启动会拖一个黑色占位，
+    // 故等真实图片就绪；且要求以纵向速度为主
     if (![image isKindOfClass:[UIImageView class]] || !image.window || !((UIImageView *)image).image) return NO;
     CGPoint velocity = [gesture velocityInView:gesture.view];
     return fabs(velocity.y) > fabs(velocity.x) * 1.15;

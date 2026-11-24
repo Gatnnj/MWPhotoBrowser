@@ -55,7 +55,7 @@ static NSString *MWPhotoBlurCacheDirectory(void) {
     return MWPhotoImageCacheDirectory();
 }
 
-/// Cache by the URL path only; query parameters may contain rotating credentials.
+/// 只取 URL 路径作为缓存键，忽略可能含轮换凭证的 query 参数
 static NSString *MWPhotoCanonicalBlurCacheURL(NSURL *url) {
     if (!url) return nil;
     return [url.absoluteString componentsSeparatedByString:@"?"].firstObject;
@@ -79,6 +79,7 @@ static NSString *MWPhotoBlurCachePath(NSURL *url, CGFloat radius) {
     return [[MWPhotoBlurCacheDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"blur_%@_%@.jpg", prefix, radiusKey]] copy];
 }
 
+/// 读取模糊缓存图，并按配套 plist 恢复 scale 与方向
 static UIImage *MWPhotoReadBlurCache(NSString *path) {
     UIImage *decoded = [UIImage imageWithContentsOfFile:path];
     if (!decoded.CGImage) return nil;
@@ -163,6 +164,7 @@ static void MWPhotoEnforceImageCacheLimitIfNeeded(void) {
     });
 }
 
+/// 写入模糊图 JPEG 与配套元数据 plist，并触发容量淘汰
 static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     if (!image || !path) return;
     NSString *directory = [path stringByDeletingLastPathComponent];
@@ -341,10 +343,9 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     [_gridWebImageOperation cancel];
     _gridWebImageOperation = nil;
 
-    // A source image is retained while loaded, so entitlement changes can switch
-    // between the original and blurred rendering without replacing the URL/model.
+    // 已加载的源图被保留，切换模糊开关无需更换 URL/模型即可在原图与模糊间切换
     UIImage *source = self.sourceImage ?: self.underlyingImage;
-    if (!source) return; // An in-flight fetch will use the updated flag on completion.
+    if (!source) return; // 无现成源图则等待在途加载完成后按新标志处理
     self.sourceImage = source;
     NSUInteger generation = ++_loadGeneration;
     _loadingInProgress = YES;
@@ -406,8 +407,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     if (_gridThumbnailLoading) return;
 
     if (!_photoURL) {
-        // Non-URL sources keep the legacy loading behavior. The community
-        // gallery's single-large-URL path takes the downsampled request below.
+        // 非 URL 来源走旧加载流程；大图单 URL 路径走下面的降采样请求
         [self loadUnderlyingImageAndNotify];
         return;
     }
@@ -417,8 +417,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     _gridThumbnailPixelSize = pixelSize;
     SDWebImageContext *context = @{
         SDWebImageContextImageThumbnailPixelSize: [NSValue valueWithCGSize:pixelSize],
-        // Keep the decoded thumbnail out of SDWebImage's memory cache; retain
-        // the compressed original and thumbnail variants on disk for reuse.
+        // 解码缩略图不入 SDWebImage 内存缓存，压缩原图与缩略图变体留在磁盘复用
         SDWebImageContextStoreCacheType: @(SDImageCacheTypeDisk)
     };
     __weak typeof(self) weakSelf = self;
@@ -465,49 +464,47 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     self.gridThumbnailImage = nil;
 }
 
-// Set the underlyingImage
+/// 按来源分发：已持有 UIImage 直接完成，否则按 URL/Asset 异步加载
 - (void)performLoadUnderlyingImageAndNotify {
-    
-    // Get underlying image
+
     if (_image) {
-        
-        // We have UIImage!
+        // 已持有 UIImage，直接完成
         [self completeLoadingWithImage:_image generation:_loadGeneration];
-        
+
     } else if (_photoURL) {
-        
-        // Check what type of url it is
+
+        // 按 URL 类型分发
         if ([[[_photoURL scheme] lowercaseString] isEqualToString:@"assets-library"]) {
-            
-            // Load from assets library
+
+            // 旧 assets-library URL：桥接 PHAsset 加载
             [self _performLoadUnderlyingImageAndNotifyWithAssetsLibraryURL: _photoURL];
-            
+
         } else if ([_photoURL isFileURL]) {
-            
-            // Load from local file async
+
+            // 本地文件：异步读取
             [self _performLoadUnderlyingImageAndNotifyWithLocalFileURL: _photoURL];
-            
+
         } else {
-            
-            // Load async from web (using SDWebImage)
+
+            // 网络 URL：SDWebImage 异步下载
             [self _performLoadUnderlyingImageAndNotifyWithWebURL: _photoURL];
-            
+
         }
-        
+
     } else if (_asset) {
-        
-        // Load from photos asset
+
+        // Photos 资产加载
         [self _performLoadUnderlyingImageAndNotifyWithAsset: _asset targetSize:_assetTargetSize];
-        
+
     } else {
-        
-        // Image is empty
+
+        // 空图片，直接完成
         [self imageLoadingComplete];
-        
+
     }
 }
 
-// Load from local file
+/// 网络 URL：走 SDWebImage 异步下载，进度与完成分别发通知
 - (void)_performLoadUnderlyingImageAndNotifyWithWebURL:(NSURL *)url {
     NSUInteger generation = _loadGeneration;
     @try {
@@ -536,7 +533,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
-// Load from local file
+/// 本地文件 URL：后台队列读取
 - (void)_performLoadUnderlyingImageAndNotifyWithLocalFileURL:(NSURL *)url {
     NSUInteger generation = _loadGeneration;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -555,7 +552,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     });
 }
 
-// Load from asset library async
 // 旧的 ALAssetsLibrary（iOS 9 废弃）替换为 Photos 框架：
 // 先通过 Apple 官方的 ALAsset URL 桥接方法查出 PHAsset，再由 PHImageManager 加载全屏图
 - (void)_performLoadUnderlyingImageAndNotifyWithAssetsLibraryURL:(NSURL *)url {
@@ -605,7 +601,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
-// Load from photos library
+/// PHAsset：通过 PHImageManager 按目标尺寸异步加载
 - (void)_performLoadUnderlyingImageAndNotifyWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize {
     NSUInteger generation = _loadGeneration;
     
@@ -639,6 +635,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     });
 }
 
+/// 源图就绪：非模糊直接显示，否则进入模糊处理
 - (void)finishLoadingSourceImage:(UIImage *)image generation:(NSUInteger)generation {
     if (generation != _loadGeneration) return;
     if (!image || !self.isBlur) {
@@ -649,6 +646,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
+/// 后台做高斯模糊：先查磁盘缓存，未命中则计算并写缓存，主线程回调完成
 - (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation {
     CGFloat radius = self.radius > 0 ? self.radius : 30.0;
     NSString *cachePath = MWPhotoBlurCachePath(self.photoURL, radius);
@@ -668,7 +666,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     });
 }
 
-// Release if we can get it again from path or url
+/// 释放底层数据：取消加载并清内存，可从路径/URL 重新加载
 - (void)unloadUnderlyingImage {
 	[self cancelAnyLoading];
 	[self removeSDWebImageMemoryCacheEntries];
@@ -677,6 +675,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 	self.underlyingImage = nil;
 }
 
+/// 清掉 SDWebImage 内存缓存中的原图与缩略图条目，避免常驻占内存
 - (void)removeSDWebImageMemoryCacheEntries {
     if (!_photoURL) return;
 
@@ -698,11 +697,10 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
+/// 加载完成标记，在下一轮 runloop 发完成通知
 - (void)imageLoadingComplete {
     NSAssert([[NSThread currentThread] isMainThread], @"This method must be called on the main thread.");
-    // Complete so notify
     _loadingInProgress = NO;
-    // Notify on next run loop
     // dispatch_after 延迟 0 等价于 performSelector:afterDelay:0，均在下一次 runloop 执行
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0), dispatch_get_main_queue(), ^{
         [self postCompleteNotification];
@@ -714,6 +712,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
                                                         object:self];
 }
 
+/// 取消所有在途加载（网络/网格/Asset），并使旧 generation 失效
 - (void)cancelAnyLoading {
     _loadGeneration++;
     _loadingInProgress = NO;
@@ -731,6 +730,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
+/// 取消 PHImageManager 的 Asset 请求
 - (void)cancelImageRequest {
     if (_assetRequestID != PHInvalidImageRequestID) {
         [[PHImageManager defaultManager] cancelImageRequest:_assetRequestID];

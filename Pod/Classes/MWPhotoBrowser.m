@@ -52,7 +52,6 @@
 }
 
 /// 各初始化入口共用的默认状态设置。
-/// Default state shared by every initialization entry point.
 - (void)commonInit {
     self.hidesBottomBarWhenPushed = YES;
     _hasBelongedToViewController = NO;
@@ -82,10 +81,8 @@
 
 - (void)dealloc {
     // 取消排队的单击切换，避免回调到已销毁对象。
-    // Cancel the queued tap toggle so it never calls back into a deallocated object.
     [self cancelPendingTapToggle];
     // 控件定时器持有 self，必须断开，否则会拖住整个视图树延迟释放。
-    // The controls timer retains self; invalidate it to avoid delaying the whole view tree's release.
     [self cancelControlHiding];
     _pagingScrollView.delegate = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -143,10 +140,8 @@
 
 - (void)configurePagingScrollView:(UIScrollView *)pagingScrollView {
     // 禁止系统自动调整安全区 inset，保持手动布局。
-    // Disable automatic safe-area inset adjustment to keep manual layout.
     pagingScrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     // iOS 26 在透明导航栏下方新增滚动边缘渐隐，图片需铺满全屏故关闭。
-    // iOS 26 adds a scroll-edge fade beneath transparent navigation bars; photos are edge-to-edge, so suppress it.
     if (@available(iOS 26.0, *)) {
         pagingScrollView.topEdgeEffect.hidden = YES;
     }
@@ -177,27 +172,23 @@
         MWPhotoBrowser *strongSelf = weakSelf;
         if (!strongSelf) return nil;
         // 网格覆盖在图片页之上，其垂直拖动不应触发下拉关闭。
-        // The grid overlays the photo pages; its vertical pan must not start pull-to-dismiss.
         if (strongSelf->_gridController || strongSelf->_gridTransitioning) return nil;
         MWZoomingScrollView *page = [strongSelf pageDisplayedAtIndex:strongSelf.currentIndex];
         if (!page && strongSelf->_visiblePages.count > 0) {
             page = strongSelf->_visiblePages.allObjects.firstObject;
         }
         // 处于最小缩放才允许拖拽；初始 zoomScale 不一定等于 1。
-        // Only allow dragging at minimum zoom; the initial zoomScale is not necessarily 1.
         if (page.zoomScale > page.minimumZoomScale + 0.01) return nil;
         return [page photoImageViewForTransition];
     } setPagingEnabled:^(BOOL enabled) {
         MWPhotoBrowser *strongSelf = weakSelf;
         // 必须先判空：对 nil 直接解引用 ivar 会崩溃。
-        // Nil-check first: dereferencing an ivar on nil crashes.
         if (!strongSelf) return;
         strongSelf->_pagingScrollView.scrollEnabled = enabled;
     } setBackgroundAlpha:^(CGFloat alpha) {
         MWPhotoBrowser *strongSelf = weakSelf;
         if (!strongSelf) return;
         // 各层背景共用同一 alpha，图片本身保持不透明。
-        // All background layers share one alpha; the photo itself stays opaque.
         UIColor *background = [UIColor colorWithWhite:0 alpha:alpha];
         strongSelf.view.backgroundColor = background;
         strongSelf.view.opaque = NO;
@@ -212,7 +203,6 @@
         return [weakSelf mw_startingView];
     } dismissBlock:^{
         // 拖拽快照已完成飞回动画，故关闭系统 dismiss 动画避免重复播放。
-        // The drag snapshot already played the fly-back animation, so disable the system dismiss animation.
         MWPhotoBrowser *strongSelf = weakSelf;
         [strongSelf dismissViewControllerAnimated:NO completion:nil];
     }];
@@ -235,7 +225,6 @@
 
 - (void)setUpLegacyDismissGestureIfNeeded {
     // 自定义转场由跟手拖拽负责关闭，旧手势会在松手前提前 dismiss。
-    // The custom transition dismisses via the finger-tracking drag; the legacy gesture would dismiss too early.
     if (!_enableSwipeToDismiss || _enableCustomTransition) return;
     UISwipeGestureRecognizer *swipeGesture =
     [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(doneButtonPressed:)];
@@ -263,12 +252,10 @@
 
 - (void)willPerformLayout {
     // 默认空实现，供子类扩展。
-    // Empty by default; provided for subclasses.
 }
 
 - (void)didPerformLayout {
     // 默认空实现，供子类扩展。
-    // Empty by default; provided for subclasses.
 }
 
 #pragma mark - Toolbar
@@ -327,7 +314,6 @@
     }
 
     // 模态呈现期间发生旋转且页码变化时，恢复到旋转前的页。
-    // Restore the pre-rotation page if rotation happened during modal presentation.
     if (_currentPageIndex != _pageIndexBeforeRotation) {
         [self jumpToPageAtIndex:_pageIndexBeforeRotation animated:NO];
     }
@@ -347,7 +333,6 @@
     _pageIndexBeforeRotation = _currentPageIndex;
 
     // isMovingFromParentViewController / isBeingDismissed 在此场景不可靠，改用导航栈判定。
-    // isMovingFromParentViewController and isBeingDismissed are unreliable here; use the navigation stack instead.
     if (self.navigationController.isBeingDismissed ||
         ([self.navigationController.viewControllers objectAtIndex:0] != self &&
          ![self.navigationController.viewControllers containsObject:self])) {
@@ -386,7 +371,6 @@
     if ([self isViewLoaded]) {
         [self jumpToPageAtIndex:index animated:NO];
         // 视图不可见时强制铺页，保证首次显示即为正确页。
-        // Force tiling while invisible so the first appearance shows the correct page.
         if (!_viewIsActive) [self tilePages];
     }
 }
@@ -395,7 +379,6 @@
 
 - (void)doneButtonPressed:(id)sender {
     // 网格模式下完成按钮用于在网格与单图之间切换。
-    // In grid mode the Done button switches between grid and single-photo mode.
     if (self.enableGrid) {
         if (self.startOnGrid && !_gridController) {
             [self showGrid:YES];

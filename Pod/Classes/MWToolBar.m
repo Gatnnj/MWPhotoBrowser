@@ -57,6 +57,7 @@ static const CGFloat MWToolBarSideWidth = 40.0;
     }
 }
 
+/// 逐个摆放并加入按钮
 - (void)addItem:(UIButton *)item {
     CGRect frame;
     if (self.position == MWToolBarPositionBottom) {

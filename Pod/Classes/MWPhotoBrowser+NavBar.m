@@ -16,7 +16,6 @@
     navBar.tintColor = [UIColor whiteColor];
     navBar.barTintColor = nil;
     navBar.translucent = YES;
-//    navBar.barStyle = UIBarStyleBlack;
 
     // iOS 13+ 导航栏背景由 UINavigationBarAppearance 控制，仅设置老 API
     // （backgroundImage / barTintColor）会被系统默认外观的磨砂黑色渐变覆盖。

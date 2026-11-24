@@ -12,7 +12,6 @@
 
 - (void)updateNavigation {
 
-    // Title
     NSUInteger numberOfPhotos = [self numberOfPhotos];
     if (_gridController) {
         {
@@ -31,14 +30,14 @@
 
 - (void)jumpToPageAtIndex:(NSUInteger)index animated:(BOOL)animated {
 
-    // Change page
+    // 越界则不跳转
     if (index < [self numberOfPhotos]) {
         CGRect pageFrame = [self frameForPageAtIndex:index];
         [_pagingScrollView setContentOffset:CGPointMake(pageFrame.origin.x - PADDING, 0) animated:animated];
         [self updateNavigation];
     }
 
-    // Update timer to give more time
+    // 翻页后重置控件自动隐藏计时，给用户更多停留时间
     [self hideControlsAfterDelay];
 
 }

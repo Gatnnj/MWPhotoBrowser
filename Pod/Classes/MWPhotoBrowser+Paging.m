@@ -12,9 +12,7 @@
 
 - (void)tilePages {
 
-    // Calculate which pages should be visible
-    // Ignore padding as paging bounces encroach on that
-    // and lead to false page loads
+    // 计算可见页范围；忽略 padding，防止回弹越界导致误加载
     CGRect visibleBounds = _pagingScrollView.bounds;
     NSInteger iFirstIndex = (NSInteger)floorf((CGRectGetMinX(visibleBounds)+PADDING*2) / CGRectGetWidth(visibleBounds));
     NSInteger iLastIndex  = (NSInteger)floorf((CGRectGetMaxX(visibleBounds)-PADDING*2-1) / CGRectGetWidth(visibleBounds));
@@ -23,7 +21,7 @@
     if (iLastIndex < 0) iLastIndex = 0;
     if (iLastIndex > [self numberOfPhotos] - 1) iLastIndex = [self numberOfPhotos] - 1;
 
-    // Recycle no longer needed pages
+    // 回收不可见页
     NSInteger pageIndex;
     for (MWZoomingScrollView *page in _visiblePages) {
         pageIndex = page.index;
@@ -35,14 +33,13 @@
         }
     }
     [_visiblePages minusSet:_recycledPages];
-    while (_recycledPages.count > 2) // Only keep 2 recycled pages
+    while (_recycledPages.count > 2) // 复用池只保留 2 页
         [_recycledPages removeObject:[_recycledPages anyObject]];
 
-    // Add missing pages
+    // 补齐缺失页
     for (NSUInteger index = (NSUInteger)iFirstIndex; index <= (NSUInteger)iLastIndex; index++) {
         if (![self isDisplayingPageForIndex:index]) {
 
-            // Add new page
             MWZoomingScrollView *page = [self dequeueRecycledPage];
             if (!page) {
                 page = [[MWZoomingScrollView alloc] initWithPhotoBrowser:self];
@@ -98,20 +95,18 @@
     return page;
 }
 
-// Handle page changes
+/// 某页开始显示：释放远端大图、预加载相邻页、通知代理并更新导航
 - (void)didStartViewingPageAtIndex:(NSUInteger)index {
 
-    // Handle 0 photos
+    // 无照片时直接显示控件
     if (![self numberOfPhotos]) {
-        // Show controls
         [self setControlsHidden:NO animated:YES permanent:YES];
         return;
     }
 
-    // Release images further away than +/-1
+    // 释放当前页 ±1 之外的大图
     NSUInteger i;
     if (index > 0) {
-        // Release anything < index - 1
         for (i = 0; i < index-1; i++) {
             id photo = [_photos objectAtIndex:i];
             if (photo != [NSNull null]) {
@@ -122,7 +117,6 @@
         }
     }
     if (index < [self numberOfPhotos] - 1) {
-        // Release anything > index + 1
         for (i = index + 2; i < _photos.count; i++) {
             id photo = [_photos objectAtIndex:i];
             if (photo != [NSNull null]) {
@@ -133,22 +127,20 @@
         }
     }
 
-    // Load adjacent images if needed and the photo is already
-    // loaded. Also called after photo has been loaded in background
+    // 当前图已就绪时预加载相邻页（后台加载完成后也会回调到此）
     id <MWPhoto> currentPhoto = [self photoAtIndex:index];
     if ([currentPhoto underlyingImage]) {
-        // photo loaded so load ajacent now
         [self loadAdjacentPhotosIfNecessary:currentPhoto];
     }
 
-    // Notify delegate
+    // 页码变化时通知代理
     if (index != _previousPageIndex) {
         if ([self.delegate respondsToSelector:@selector(photoBrowser:didDisplayPhotoAtIndex:)])
             [self.delegate photoBrowser:self didDisplayPhotoAtIndex:index];
         _previousPageIndex = index;
     }
 
-    // Update nav
+    // 更新导航
     [self updateNavigation];
 
 }
@@ -157,13 +149,13 @@
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
 
-    // Checks
+    // 视图未激活 / 布局中 / 旋转中不处理
     if (!_viewIsActive || _performingLayout || _rotating) return;
 
-    // Tile pages
+    // 按需铺页
     [self tilePages];
 
-    // Calculate current page
+    // 计算当前页
     CGRect visibleBounds = _pagingScrollView.bounds;
     NSInteger index = (NSInteger)(floorf(CGRectGetMidX(visibleBounds) / CGRectGetWidth(visibleBounds)));
     if (index < 0) index = 0;
@@ -177,12 +169,12 @@
 }
 
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
-    // Hide controls when dragging begins
+    // 开始拖拽即隐藏控件
     [self setControlsHidden:YES animated:YES permanent:NO];
 }
 
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
-    // Update nav when page changes
+    // 减速停止、页面切换后更新导航
     [self updateNavigation];
 }
 
