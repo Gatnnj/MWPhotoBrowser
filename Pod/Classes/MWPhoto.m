@@ -6,179 +6,19 @@
 //  Copyright 2010 d3i. All rights reserved.
 //
 
-#if __has_include(<SDWebImage/SDWebImage.h>)
-#import <SDWebImage/SDWebImage.h>
-#else
-#import "SDWebImage.h"
-#endif
-// AssetsLibrary（iOS 9 废弃）替换为 Photos 框架
 #import <Photos/Photos.h>
-#import <CommonCrypto/CommonDigest.h>
 #import <ImageIO/ImageIO.h>
 #import <math.h>
 #import "MWPhoto.h"
 #import "MWPhotoBrowser.h"
 #import "UIImage+MWPhotoBrowser.h"
-
-static dispatch_queue_t MWPhotoBlurQueue(void) {
-    static dispatch_queue_t queue;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        queue = dispatch_queue_create("com.mwphotobrowser.image-blur", DISPATCH_QUEUE_SERIAL);
-    });
-    return queue;
-}
-
-/// 模糊图缓存目录。
-static NSString *MWPhotoImageCacheDirectory(void) {
-    static NSString *directory;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
-        NSString *caches = paths.firstObject;
-        directory = [[caches stringByAppendingPathComponent:@"MWPhotoBrowserImageCache"] copy];
-
-        // 旧实现分别使用 MWPhotoBrowserBlurCache / MWPhotoBrowserZoomCache 两个目录，
-        // 这里一次性清理，避免遗留数据继续占用空间（两者都是可重建的缓存）
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        for (NSString *legacyName in @[@"MWPhotoBrowserBlurCache", @"MWPhotoBrowserZoomCache"]) {
-            NSString *legacyPath = [caches stringByAppendingPathComponent:legacyName];
-            if ([fileManager fileExistsAtPath:legacyPath]) {
-                [fileManager removeItemAtPath:legacyPath error:nil];
-            }
-        }
-    });
-    return directory;
-}
-
-static NSString *MWPhotoBlurCacheDirectory(void) {
-    return MWPhotoImageCacheDirectory();
-}
-
-/// Cache by the URL path only; query parameters may contain rotating credentials.
-static NSString *MWPhotoCanonicalBlurCacheURL(NSURL *url) {
-    if (!url) return nil;
-    return [url.absoluteString componentsSeparatedByString:@"?"].firstObject;
-}
-
-static NSString *MWPhotoBlurCachePrefix(NSURL *url) {
-    if (!url) return nil;
-    NSData *data = [MWPhotoCanonicalBlurCacheURL(url) dataUsingEncoding:NSUTF8StringEncoding];
-    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
-    CC_SHA256(data.bytes, (CC_LONG)data.length, digest);
-    NSMutableString *hex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
-    for (NSUInteger i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) [hex appendFormat:@"%02x", digest[i]];
-    return hex;
-}
-
-static NSString *MWPhotoBlurCachePath(NSURL *url, CGFloat radius) {
-    NSString *prefix = MWPhotoBlurCachePrefix(url);
-    if (!prefix) return nil;
-    NSString *radiusKey = [NSString stringWithFormat:@"%.3f", radius];
-    // blur_ 前缀用于标记生成的模糊图缓存。
-    return [[MWPhotoBlurCacheDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"blur_%@_%@.jpg", prefix, radiusKey]] copy];
-}
-
-static UIImage *MWPhotoReadBlurCache(NSString *path) {
-    UIImage *decoded = [UIImage imageWithContentsOfFile:path];
-    if (!decoded.CGImage) return nil;
-    NSDictionary *metadata = [NSDictionary dictionaryWithContentsOfFile:[path stringByAppendingPathExtension:@"plist"]];
-    CGFloat scale = [metadata[@"scale"] doubleValue];
-    UIImageOrientation orientation = metadata ? [metadata[@"orientation"] integerValue] : decoded.imageOrientation;
-    if (scale <= 0) scale = decoded.scale;
-    return [UIImage imageWithCGImage:decoded.CGImage scale:scale orientation:orientation];
-}
-
-#pragma mark - Cache Size Control
-
-/// 缓存目录总容量上限
-static const unsigned long long MWPhotoImageCacheLimitBytes = 400ULL * 1024ULL * 1024ULL;
-/// 淘汰目标：删除到上限的 70%，避免每次写入都触发一轮删除
-static const double MWPhotoImageCacheTrimRatio = 0.7;
-/// 两次容量检查之间的最小间隔（秒）
-static const CFTimeInterval MWPhotoImageCacheCheckInterval = 60.0;
-/// 单次最多删除的文件数，避免长时间占用串行队列
-static const NSUInteger MWPhotoImageCacheMaxDeletionsPerPass = 200;
-
-static BOOL MWPhotoCacheFileIsBlurJPEG(NSString *fileName) {
-    return [fileName hasPrefix:@"blur_"] && [fileName hasSuffix:@".jpg"];
-}
-
-/// 目录总大小超过上限时，按修改时间从旧到新删除，直到降到目标容量。
-/// 内部派发到模糊缓存所用的串行队列，与写入、清理操作保持顺序一致。
-static void MWPhotoEnforceImageCacheLimitIfNeeded(void) {
-    dispatch_async(MWPhotoBlurQueue(), ^{
-        // 节流：避免每写一张图都全量扫描一次目录
-        static CFTimeInterval lastCheck = 0;
-        CFTimeInterval now = CFAbsoluteTimeGetCurrent();
-        if (lastCheck > 0 && (now - lastCheck) < MWPhotoImageCacheCheckInterval) {
-            return;
-        }
-        lastCheck = now;
-
-        NSString *directory = MWPhotoImageCacheDirectory();
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        NSArray<NSString *> *fileNames = [fileManager contentsOfDirectoryAtPath:directory error:nil];
-        if (!fileNames.count) return;
-
-        unsigned long long totalBytes = 0;
-        NSMutableArray<NSDictionary *> *entries = [NSMutableArray arrayWithCapacity:fileNames.count];
-        for (NSString *fileName in fileNames) {
-            NSString *path = [directory stringByAppendingPathComponent:fileName];
-            NSDictionary *attributes = [fileManager attributesOfItemAtPath:path error:nil];
-            if (!attributes) continue;
-            unsigned long long size = [attributes[NSFileSize] unsignedLongLongValue];
-            totalBytes += size;
-            [entries addObject:@{
-                @"path": path,
-                @"size": @(size),
-                @"date": attributes[NSFileModificationDate] ?: [NSDate distantPast],
-                @"name": fileName
-            }];
-        }
-        if (totalBytes <= MWPhotoImageCacheLimitBytes) return;
-
-        // 修改时间升序：最旧的排在前面，优先删除
-        [entries sortUsingComparator:^NSComparisonResult(NSDictionary *lhs, NSDictionary *rhs) {
-            return [lhs[@"date"] compare:rhs[@"date"]];
-        }];
-
-        unsigned long long targetBytes = (unsigned long long)(MWPhotoImageCacheLimitBytes * MWPhotoImageCacheTrimRatio);
-        unsigned long long removedBytes = 0;
-        NSUInteger removedCount = 0;
-        for (NSDictionary *entry in entries) {
-            if (totalBytes - removedBytes <= targetBytes) break;
-            if (removedCount >= MWPhotoImageCacheMaxDeletionsPerPass) break;
-
-            NSString *path = entry[@"path"];
-            // 删除模糊图 JPEG 时同步清理配套的 .plist，避免产生孤儿文件
-            if (MWPhotoCacheFileIsBlurJPEG(entry[@"name"])) {
-                [fileManager removeItemAtPath:[path stringByAppendingPathExtension:@"plist"] error:nil];
-            }
-            if ([fileManager removeItemAtPath:path error:nil]) {
-                removedBytes += [entry[@"size"] unsignedLongLongValue];
-                removedCount++;
-            }
-        }
-    });
-}
-
-static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
-    if (!image || !path) return;
-    NSString *directory = [path stringByDeletingLastPathComponent];
-    [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
-    NSData *data = UIImageJPEGRepresentation(image, 0.94);
-    if (!data || ![data writeToFile:path options:NSDataWritingAtomic error:nil]) return;
-    NSDictionary *metadata = @{@"scale": @(image.scale), @"orientation": @(image.imageOrientation)};
-    [metadata writeToFile:[path stringByAppendingPathExtension:@"plist"] atomically:YES];
-    MWPhotoEnforceImageCacheLimitIfNeeded();
-}
+#import "MWPhotoImageCache.h"
 
 @interface MWPhoto () {
 
     BOOL _loadingInProgress;
-    id <SDWebImageOperation> _webImageOperation;
-    id <SDWebImageOperation> _gridWebImageOperation;
+    id<MWPhotoImageLoadingOperation> _webImageOperation;
+    id<MWPhotoImageLoadingOperation> _gridWebImageOperation;
     PHImageRequestID _assetRequestID;
     NSUInteger _loadGeneration;
     NSUInteger _gridLoadGeneration;
@@ -194,17 +34,25 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 @property (nonatomic) CGSize assetTargetSize;
 @property (nonatomic, strong) UIImage *sourceImage;
 @property (nonatomic, strong) UIImage *gridThumbnailImage;
+@property (nonatomic, strong) id<MWPhotoImageLoader> configuredImageLoader;
 - (void)imageLoadingComplete;
 - (void)completeLoadingWithImage:(UIImage *)image generation:(NSUInteger)generation;
 - (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation;
 - (void)finishLoadingSourceImage:(UIImage *)image generation:(NSUInteger)generation;
-- (void)removeSDWebImageMemoryCacheEntries;
+- (void)removeImageLoaderMemoryCacheEntries;
 
 @end
 
 @implementation MWPhoto
 
 @synthesize underlyingImage = _underlyingImage; // synth property from protocol
+
+- (id<MWPhotoImageLoader>)imageLoader {
+    if (!self.configuredImageLoader) {
+        self.configuredImageLoader = [MWPhotoSDWebImageLoader new];
+    }
+    return self.configuredImageLoader;
+}
 
 #pragma mark - Class Methods
 
@@ -217,36 +65,11 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
 }
 
 + (void)clearBlurCacheWithCompletion:(void (^)(void))completion {
-    dispatch_async(MWPhotoBlurQueue(), ^{
-        // 只清理模糊图相关文件（blur_ 前缀，含配套的 .plist）。
-        NSString *directory = MWPhotoImageCacheDirectory();
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        for (NSString *fileName in [fileManager contentsOfDirectoryAtPath:directory error:nil]) {
-            if ([fileName hasPrefix:@"blur_"]) {
-                [fileManager removeItemAtPath:[directory stringByAppendingPathComponent:fileName] error:nil];
-            }
-        }
-        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
-    });
+    MWPhotoClearBlurCache(completion);
 }
 
 + (void)clearBlurCacheForURL:(NSURL *)url completion:(void (^)(void))completion {
-    NSString *prefix = MWPhotoBlurCachePrefix(url);
-    if (!prefix) {
-        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
-        return;
-    }
-    dispatch_async(MWPhotoBlurQueue(), ^{
-        NSString *directory = MWPhotoBlurCacheDirectory();
-        NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:directory error:nil];
-        NSString *filePrefix = [NSString stringWithFormat:@"blur_%@_", prefix];
-        for (NSString *file in files) {
-            if ([file hasPrefix:filePrefix]) {
-                [[NSFileManager defaultManager] removeItemAtPath:[directory stringByAppendingPathComponent:file] error:nil];
-            }
-        }
-        if (completion) dispatch_async(dispatch_get_main_queue(), completion);
-    });
+    MWPhotoClearBlurCacheForURL(url, completion);
 }
 
 + (MWPhoto *)photoWithImage:(UIImage *)image {
@@ -341,10 +164,9 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     [_gridWebImageOperation cancel];
     _gridWebImageOperation = nil;
 
-    // A source image is retained while loaded, so entitlement changes can switch
-    // between the original and blurred rendering without replacing the URL/model.
+    // 已加载的源图被保留，切换模糊开关无需更换 URL/模型即可在原图与模糊间切换
     UIImage *source = self.sourceImage ?: self.underlyingImage;
-    if (!source) return; // An in-flight fetch will use the updated flag on completion.
+    if (!source) return; // 无现成源图则等待在途加载完成后按新标志处理
     self.sourceImage = source;
     NSUInteger generation = ++_loadGeneration;
     _loadingInProgress = YES;
@@ -406,8 +228,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     if (_gridThumbnailLoading) return;
 
     if (!_photoURL) {
-        // Non-URL sources keep the legacy loading behavior. The community
-        // gallery's single-large-URL path takes the downsampled request below.
+        // 非 URL 来源走旧加载流程；大图单 URL 路径走下面的降采样请求
         [self loadUnderlyingImageAndNotify];
         return;
     }
@@ -415,48 +236,45 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     _gridThumbnailLoading = YES;
     NSUInteger generation = ++_gridLoadGeneration;
     _gridThumbnailPixelSize = pixelSize;
-    SDWebImageContext *context = @{
-        SDWebImageContextImageThumbnailPixelSize: [NSValue valueWithCGSize:pixelSize],
-        // Keep the decoded thumbnail out of SDWebImage's memory cache; retain
-        // the compressed original and thumbnail variants on disk for reuse.
-        SDWebImageContextStoreCacheType: @(SDImageCacheTypeDisk)
-    };
     __weak typeof(self) weakSelf = self;
-    _gridWebImageOperation = [[SDWebImageManager sharedManager] loadImageWithURL:_photoURL
-                                                                           options:0
-                                                                          context:context
-                                                                         progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
+    _gridWebImageOperation = [self.imageLoader loadImageAtURL:_photoURL
+                                           thumbnailPixelSize:pixelSize
+                                                     progress:^(CGFloat progress) {
         MWPhoto *photo = weakSelf;
-        if (!photo || expectedSize <= 0) return;
-        float progress = receivedSize / (float)expectedSize;
-        NSDictionary *info = @{@"progress": @(progress), @"photo": photo};
-        [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:info];
-    } completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
-        if (!finished) return;
+        if (!photo) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSDictionary *info = @{ @"progress": @(progress), @"photo": photo };
+            [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:info];
+        });
+    } completion:^(UIImage * _Nullable image, NSError * _Nullable error) {
         MWPhoto *photo = weakSelf;
-        if (!photo || generation != photo->_gridLoadGeneration) return;
-        photo->_gridWebImageOperation = nil;
+        if (!photo) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (generation != photo->_gridLoadGeneration) return;
+            photo->_gridWebImageOperation = nil;
+            if (error) MWLog(@"Image loader failed to load thumbnail: %@", error);
 
-        void (^finish)(UIImage *) = ^(UIImage *gridImage) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (generation != photo->_gridLoadGeneration) return;
-                photo->_gridThumbnailLoading = NO;
-                if (photo->_gridThumbnailDemanded) {
-                    photo.gridThumbnailImage = gridImage;
-                    [photo postCompleteNotification];
-                }
-            });
-        };
-        if (image && photo.isBlur) {
-            CGFloat blurRadius = MAX(2, MIN(photo.radius, MAX(pixelSize.width, pixelSize.height) / 16.0));
-            dispatch_async(MWPhotoBlurQueue(), ^{
-                @autoreleasepool {
-                    finish([UIImage gaussianBlurWithImage:image ofRadius:blurRadius] ?: image);
-                }
-            });
-        } else {
-            finish(image);
-        }
+            void (^finish)(UIImage *) = ^(UIImage *gridImage) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (generation != photo->_gridLoadGeneration) return;
+                    photo->_gridThumbnailLoading = NO;
+                    if (photo->_gridThumbnailDemanded) {
+                        photo.gridThumbnailImage = gridImage;
+                        [photo postCompleteNotification];
+                    }
+                });
+            };
+            if (image && photo.isBlur) {
+                CGFloat blurRadius = MAX(2, MIN(photo.radius, MAX(pixelSize.width, pixelSize.height) / 16.0));
+                dispatch_async(MWPhotoBlurQueue(), ^{
+                    @autoreleasepool {
+                        finish([UIImage gaussianBlurWithImage:image ofRadius:blurRadius] ?: image);
+                    }
+                });
+            } else {
+                finish(image);
+            }
+        });
     }];
 }
 
@@ -465,78 +283,76 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     self.gridThumbnailImage = nil;
 }
 
-// Set the underlyingImage
+/// 按来源分发：已持有 UIImage 直接完成，否则按 URL/Asset 异步加载
 - (void)performLoadUnderlyingImageAndNotify {
-    
-    // Get underlying image
+
     if (_image) {
-        
-        // We have UIImage!
+        // 已持有 UIImage，直接完成
         [self completeLoadingWithImage:_image generation:_loadGeneration];
-        
+
     } else if (_photoURL) {
-        
-        // Check what type of url it is
+
+        // 按 URL 类型分发
         if ([[[_photoURL scheme] lowercaseString] isEqualToString:@"assets-library"]) {
-            
-            // Load from assets library
+
+            // 旧 assets-library URL：桥接 PHAsset 加载
             [self _performLoadUnderlyingImageAndNotifyWithAssetsLibraryURL: _photoURL];
-            
+
         } else if ([_photoURL isFileURL]) {
-            
-            // Load from local file async
+
+            // 本地文件：异步读取
             [self _performLoadUnderlyingImageAndNotifyWithLocalFileURL: _photoURL];
-            
+
         } else {
-            
-            // Load async from web (using SDWebImage)
+
+            // 网络 URL：通过可替换的图片加载器异步加载
             [self _performLoadUnderlyingImageAndNotifyWithWebURL: _photoURL];
-            
+
         }
-        
+
     } else if (_asset) {
-        
-        // Load from photos asset
+
+        // Photos 资产加载
         [self _performLoadUnderlyingImageAndNotifyWithAsset: _asset targetSize:_assetTargetSize];
-        
+
     } else {
-        
-        // Image is empty
+
+        // 空图片，直接完成
         [self imageLoadingComplete];
-        
+
     }
 }
 
-// Load from local file
+/// 网络 URL：通过图片加载器异步加载，进度与完成分别发通知
 - (void)_performLoadUnderlyingImageAndNotifyWithWebURL:(NSURL *)url {
     NSUInteger generation = _loadGeneration;
     @try {
-        SDWebImageManager *manager = [SDWebImageManager sharedManager];
-        _webImageOperation = [manager loadImageWithURL:url options:0 progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
-            if (expectedSize > 0) {
-                float progress = receivedSize / (float)expectedSize;
-                NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys:
-                                      [NSNumber numberWithFloat:progress], @"progress",
-                                      self, @"photo", nil];
-                [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:dict];
-            }
-        } completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
-            if (error) {
-                MWLog(@"SDWebImage failed to download image: %@", error);
-            }
-            if (!finished) return;
-            // 显式 self 表明 block 有意引用，消除隐式 retain 警告（该 block 为一次性回调，无循环引用）
-            self->_webImageOperation = nil;
-            [self completeLoadingWithImage:image generation:generation];
+        __weak typeof(self) weakSelf = self;
+        _webImageOperation = [self.imageLoader loadImageAtURL:url
+                                           thumbnailPixelSize:CGSizeZero
+                                                     progress:^(CGFloat progress) {
+            MWPhoto *photo = weakSelf;
+            if (!photo) return;
+            NSDictionary *info = @{ @"progress": @(progress), @"photo": photo };
+            [[NSNotificationCenter defaultCenter] postNotificationName:MWPHOTO_PROGRESS_NOTIFICATION object:info];
+        } completion:^(UIImage * _Nullable image, NSError * _Nullable error) {
+            MWPhoto *photo = weakSelf;
+            if (!photo) return;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (generation != photo->_loadGeneration) return;
+                photo->_webImageOperation = nil;
+                if (error) MWLog(@"Image loader failed to download image: %@", error);
+                [photo completeLoadingWithImage:image generation:generation];
+            });
         }];
-    } @catch (NSException *e) {
-        MWLog(@"Photo from web: %@", e);
+    } @catch (NSException *exception) {
+        MWLog(@"Photo from web: %@", exception);
         _webImageOperation = nil;
         [self imageLoadingComplete];
     }
 }
 
-// Load from local file
+/// 本地文件 URL：后台队列读取
 - (void)_performLoadUnderlyingImageAndNotifyWithLocalFileURL:(NSURL *)url {
     NSUInteger generation = _loadGeneration;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -555,7 +371,6 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     });
 }
 
-// Load from asset library async
 // 旧的 ALAssetsLibrary（iOS 9 废弃）替换为 Photos 框架：
 // 先通过 Apple 官方的 ALAsset URL 桥接方法查出 PHAsset，再由 PHImageManager 加载全屏图
 - (void)_performLoadUnderlyingImageAndNotifyWithAssetsLibraryURL:(NSURL *)url {
@@ -605,7 +420,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
-// Load from photos library
+/// PHAsset：通过 PHImageManager 按目标尺寸异步加载
 - (void)_performLoadUnderlyingImageAndNotifyWithAsset:(PHAsset *)asset targetSize:(CGSize)targetSize {
     NSUInteger generation = _loadGeneration;
     
@@ -639,6 +454,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     });
 }
 
+/// 源图就绪：非模糊直接显示，否则进入模糊处理
 - (void)finishLoadingSourceImage:(UIImage *)image generation:(NSUInteger)generation {
     if (generation != _loadGeneration) return;
     if (!image || !self.isBlur) {
@@ -649,6 +465,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
+/// 后台做高斯模糊：先查磁盘缓存，未命中则计算并写缓存，主线程回调完成
 - (void)processSourceImage:(UIImage *)image generation:(NSUInteger)generation {
     CGFloat radius = self.radius > 0 ? self.radius : 30.0;
     NSString *cachePath = MWPhotoBlurCachePath(self.photoURL, radius);
@@ -668,41 +485,27 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     });
 }
 
-// Release if we can get it again from path or url
+/// 释放底层数据：取消加载并清内存，可从路径/URL 重新加载
 - (void)unloadUnderlyingImage {
 	[self cancelAnyLoading];
-	[self removeSDWebImageMemoryCacheEntries];
+	[self removeImageLoaderMemoryCacheEntries];
 	self.sourceImage = nil;
 	self.gridThumbnailImage = nil;
 	self.underlyingImage = nil;
 }
 
-- (void)removeSDWebImageMemoryCacheEntries {
+/// 请求图片加载器清理 URL 图片对应的内存缓存（若加载器支持）。
+- (void)removeImageLoaderMemoryCacheEntries {
     if (!_photoURL) return;
-
-    SDWebImageManager *manager = [SDWebImageManager sharedManager];
-    id<SDImageCache> imageCache = manager.imageCache;
-    NSString *originalKey = [manager cacheKeyForURL:_photoURL context:nil];
-    if (originalKey.length) {
-        [imageCache removeImageForKey:originalKey cacheType:SDImageCacheTypeMemory completion:nil];
-    }
-
-    if (_gridThumbnailPixelSize.width > 0 && _gridThumbnailPixelSize.height > 0) {
-        SDWebImageContext *context = @{
-            SDWebImageContextImageThumbnailPixelSize: [NSValue valueWithCGSize:_gridThumbnailPixelSize]
-        };
-        NSString *thumbnailKey = [manager cacheKeyForURL:_photoURL context:context];
-        if (thumbnailKey.length) {
-            [imageCache removeImageForKey:thumbnailKey cacheType:SDImageCacheTypeMemory completion:nil];
-        }
+    if ([self.imageLoader respondsToSelector:@selector(removeMemoryCacheForURL:thumbnailPixelSize:)]) {
+        [self.imageLoader removeMemoryCacheForURL:_photoURL thumbnailPixelSize:_gridThumbnailPixelSize];
     }
 }
 
+/// 加载完成标记，在下一轮 runloop 发完成通知
 - (void)imageLoadingComplete {
     NSAssert([[NSThread currentThread] isMainThread], @"This method must be called on the main thread.");
-    // Complete so notify
     _loadingInProgress = NO;
-    // Notify on next run loop
     // dispatch_after 延迟 0 等价于 performSelector:afterDelay:0，均在下一次 runloop 执行
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0), dispatch_get_main_queue(), ^{
         [self postCompleteNotification];
@@ -714,6 +517,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
                                                         object:self];
 }
 
+/// 取消所有在途加载（网络/网格/Asset），并使旧 generation 失效
 - (void)cancelAnyLoading {
     _loadGeneration++;
     _loadingInProgress = NO;
@@ -731,6 +535,7 @@ static void MWPhotoWriteBlurCache(UIImage *image, NSString *path) {
     }
 }
 
+/// 取消 PHImageManager 的 Asset 请求
 - (void)cancelImageRequest {
     if (_assetRequestID != PHInvalidImageRequestID) {
         [[PHImageManager defaultManager] cancelImageRequest:_assetRequestID];

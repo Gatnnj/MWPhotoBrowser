@@ -13,7 +13,6 @@
 #else
 #import "SDWebImage.h"
 #endif
-#import "MWCommon.h"
 
 // 丝滑转场演示专用：在窗口上放置一个缩略图作为连贯动画的起点
 @interface Menu ()

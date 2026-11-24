@@ -16,45 +16,44 @@
 
 - (void)showGrid:(BOOL)animated {
 
+    // 外部调用入口：先确保视图与网格前置条件就绪，避免静默失败或空白网格。
+    [self loadViewIfNeeded];
+    if (!self.enableGrid) return;
+    if (_gridTransitioning) return;
     if (_gridController) return;
     _gridTransitioning = YES;
+    _isShowingGrid = YES;
 
-    // Init grid controller
+    // 创建网格控制器
     _gridController = [[MWGridViewController alloc] init];
-    // 每次重新展示都从网格顶部开始，避免继承上次浏览位置。
-    _currentGridContentOffset = CGPointZero;
-    _gridController.initialContentOffset = _currentGridContentOffset;
     _gridController.browser = self;
     _gridController.view.frame = self.view.bounds;
     _gridController.view.frame = CGRectOffset(_gridController.view.frame, 0, (self.startOnGrid ? -1 : 1) * self.view.bounds.size.height);
 
-    // Stop specific layout being triggered
+    // 跳过下一次分页滚动视图定位，避免触发多余布局
     _skipNextPagingScrollViewPositioning = YES;
 
-    // Add as a child view controller
+    // 挂载为子控制器
     [self addChildViewController:_gridController];
     [self.view addSubview:_gridController.view];
 
-    // Grid gets its own downward gesture. The photo-browser pull gesture stays
-    // disabled while a grid is present, so this can only close the grid.
+    // 网格单独挂下滑关闭手势；网格展示期间大图下拉手势已禁用，此手势只用于关闭网格
     _gridDismissPanGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleGridDismissPan:)];
     _gridDismissPanGesture.delegate = self;
     _gridDismissPanGesture.cancelsTouchesInView = NO;
     [_gridController.view addGestureRecognizer:_gridDismissPanGesture];
-    // At the top, let a downward grid-dismiss pan win before the collection
-    // view's pan. If it rejects the gesture, normal scrolling proceeds without
-    // interruption or a content-offset reset.
+    // 顶部时让下滑关闭手势优先于 collectionView 的 pan；被拒绝则正常滚动，不打断也不重置偏移
     [_gridController.collectionView.panGestureRecognizer requireGestureRecognizerToFail:_gridDismissPanGesture];
 
-    // Perform any adjustments
+    // 触发布局并把当前页居中定位
     [_gridController.view layoutIfNeeded];
     [_gridController adjustOffsetsAsRequired];
 
-    // Update
+    // 更新导航并常显控件
     [self updateNavigation];
     [self setControlsHidden:NO animated:YES permanent:YES];
 
-    // Animate grid in and photo scroller out
+    // 网格滑入、分页滚动视图滑出
     [_gridController willMoveToParentViewController:self];
     [UIView animateWithDuration:animated ? 0.3 : 0 animations:^(void) {
         // 显式 self 消除 block 隐式 retain 警告
@@ -69,17 +68,18 @@
 
 }
 
+/// 关闭网格：滑出网格并回到单图分页
 - (void)hideGrid {
 
     if (!_gridController) return;
     _gridTransitioning = YES;
 
-    // Position prior to hide animation
+    // 动画前先把分页视图放到滑出起点
     CGRect newPagingFrame = [self frameForPagingScrollView];
     newPagingFrame = CGRectOffset(newPagingFrame, 0, (self.startOnGrid ? 1 : -1) * newPagingFrame.size.height);
     _pagingScrollView.frame = newPagingFrame;
 
-    // Remember and remove controller now so things can detect a nil grid controller
+    // 先暂存并清空控制器，便于外部检测 nil
     MWGridViewController *tmpGridController = _gridController;
     if (_gridDismissPanGesture) {
         [tmpGridController.view removeGestureRecognizer:_gridDismissPanGesture];
@@ -87,11 +87,12 @@
         _gridDismissPanGesture = nil;
     }
     _gridController = nil;
+    _isShowingGrid = NO;
 
-    // Update
+    // 更新导航
     [self updateNavigation];
 
-    // Animate, hide grid and show paging scroll view
+    // 网格滑出、分页视图归位
     [UIView animateWithDuration:0.3 animations:^{
         tmpGridController.view.frame = CGRectOffset(self.view.bounds, 0, (self.startOnGrid ? -1 : 1) * self.view.bounds.size.height);
         // 显式 self 消除 block 隐式 retain 警告
@@ -106,6 +107,7 @@
 
 }
 
+/// 网格下滑关闭手势的判定：仅顶部、且为向下主导的拖动才允许开始
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
     if (gestureRecognizer != _gridDismissPanGesture) return YES;
     if (!_gridController || _gridTransitioning) return NO;
@@ -113,10 +115,12 @@
     CGPoint velocity = [(UIPanGestureRecognizer *)gestureRecognizer velocityInView:self.view];
     if (velocity.y <= 0 || velocity.y <= fabs(velocity.x) * 1.15) return NO;
 
+    // 只有滚动到顶部附近才响应下滑关闭
     CGFloat topOffset = -_gridController.collectionView.adjustedContentInset.top;
     return _gridController.collectionView.contentOffset.y <= topOffset + 1.0;
 }
 
+/// 网格下滑手势处理：跟手下移，松手达阈值关闭否则回弹
 - (void)handleGridDismissPan:(UIPanGestureRecognizer *)pan {
     if (!_gridController) return;
     switch (pan.state) {

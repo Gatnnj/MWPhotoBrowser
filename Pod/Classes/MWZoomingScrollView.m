@@ -7,14 +7,13 @@
 //
 
 #import "MWCircularProgressView.h"
-#import "MWCommon.h"
 #import "MWZoomingScrollView.h"
 #import "MWPhotoBrowser.h"
 #import "MWPhoto.h"
 #import "MWPhotoBrowserPrivate.h"
 #import "UIImage+MWPhotoBrowser.h"
 
-// Private methods and properties
+// 私有方法与属性
 @interface MWZoomingScrollView () {
     
     MWPhotoBrowser __weak *_photoBrowser;
@@ -32,34 +31,32 @@
 - (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser {
     if ((self = [super init])) {
 
-        // Keep the iOS 26 scroll-edge fade from tinting the image beneath the
-        // transparent navigation bar.
+        // 关闭 iOS 26 透明导航栏下方的滚动边缘渐隐，避免给图片染色
         if (@available(iOS 26.0, *)) {
             self.topEdgeEffect.hidden = YES;
         }
-        
-        // Setup
+
         _index = NSUIntegerMax;
         _photoBrowser = browser;
-        
-		// Tap view for background
-		_tapView = [[MWTapDetectingView alloc] initWithFrame:self.bounds];
-		_tapView.tapDelegate = self;
-		_tapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-		_tapView.backgroundColor = [UIColor blackColor];
-		_tapView.opaque = NO;
-		[self addSubview:_tapView];
-		
-		// Image view
-		_photoImageView = [[MWTapDetectingImageView alloc] initWithFrame:CGRectZero];
-		_photoImageView.tapDelegate = self;
-		_photoImageView.contentMode = UIViewContentModeCenter;
-		_photoImageView.backgroundColor = [UIColor blackColor];
-		_photoImageView.opaque = NO;
-		[self addSubview:_photoImageView];
-		
-		// Loading indicator
-		_loadingIndicator = browser.loadingViewProvider ? browser.loadingViewProvider(self) : nil;
+
+        // 背景点击视图
+        _tapView = [[MWTapDetectingView alloc] initWithFrame:self.bounds];
+        _tapView.tapDelegate = self;
+        _tapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        _tapView.backgroundColor = [UIColor blackColor];
+        _tapView.opaque = NO;
+        [self addSubview:_tapView];
+
+        // 图片视图
+        _photoImageView = [[MWTapDetectingImageView alloc] initWithFrame:CGRectZero];
+        _photoImageView.tapDelegate = self;
+        _photoImageView.contentMode = UIViewContentModeCenter;
+        _photoImageView.backgroundColor = [UIColor blackColor];
+        _photoImageView.opaque = NO;
+        [self addSubview:_photoImageView];
+
+        // 加载指示器：优先用浏览器提供的自定义视图，否则用内置环形进度
+        _loadingIndicator = browser.loadingViewProvider ? browser.loadingViewProvider(self) : nil;
         if (!_loadingIndicator) {
             MWCircularProgressView *defaultIndicator = [[MWCircularProgressView alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
             defaultIndicator.thicknessRatio = 0.1;
@@ -72,20 +69,19 @@
         UIViewAutoresizingFlexibleBottomMargin | UIViewAutoresizingFlexibleRightMargin;
 		[self addSubview:_loadingIndicator];
 
-        // Listen progress notifications
+        // 监听加载进度通知
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(setProgressFromNotification:)
                                                      name:MWPHOTO_PROGRESS_NOTIFICATION
                                                    object:nil];
-        
-		// Setup
-		self.backgroundColor = [UIColor blackColor];
+
+        self.backgroundColor = [UIColor blackColor];
 		self.delegate = self;
 		self.showsHorizontalScrollIndicator = NO;
 		self.showsVerticalScrollIndicator = NO;
 		self.decelerationRate = UIScrollViewDecelerationRateFast;
 		self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        
+
     }
     return self;
 }
@@ -128,7 +124,7 @@
     if (image) {
         [self displayImage];
     } else {
-        // Keep the old image on screen while the refreshed model loads.
+        // 刷新模型加载期间保留旧图显示
         [self hideLoadingIndicator];
         [photo loadUnderlyingImageAndNotify];
     }
@@ -137,7 +133,7 @@
 #pragma mark - Image
 
 - (void)setPhoto:(id<MWPhoto>)photo {
-    // Cancel any loading on old photo
+    // 旧图有在途加载时先取消
     if (_photo && photo == nil) {
         if ([_photo respondsToSelector:@selector(cancelAnyLoading)]) {
             [_photo cancelAnyLoading];
@@ -148,21 +144,20 @@
     if (img) {
         [self displayImage];
     } else {
-        // Will be loading so show loading
+        // 尚未就绪，显示加载指示器
         [self showLoadingIndicator];
     }
 }
 
-// Get and display image
+/// 取图并显示；位图真正变化时才重置缩放
 - (void)displayImage {
     if (!_photo) return;
 
-    // Get image or start loading. Keep an existing image visible if a refreshed
-    // photo model has not finished loading yet.
+    // 取图或触发加载；刷新模型未就绪时保留现有图
     UIImage *img = [_photoBrowser imageForPhoto:_photo];
     if (!img || img == _photoImageView.image) return;
 
-    // Reset zoom only when the actual displayed bitmap changes.
+    // 仅在实际位图变化时重置缩放
     self.maximumZoomScale = 1;
     self.minimumZoomScale = 1;
     self.zoomScale = 1;
@@ -180,12 +175,12 @@
     [self setNeedsLayout];
 }
 
-// Image failed so just show black!
+/// 加载失败：清空图片并显示失败占位（空图片不显示）
 - (void)displayImageFailure {
     [self hideLoadingIndicator];
     _photoImageView.image = nil;
-    
-    // Show if image is not empty
+
+    // 非空图片才显示失败图标
     if (![_photo respondsToSelector:@selector(emptyImage)] || !_photo.emptyImage) {
         if (!_loadingError) {
             _loadingError = [UIImageView new];
@@ -231,6 +226,13 @@
     _loadingIndicator.hidden = YES;
 }
 
+/// 无图且图片未就绪时补显示加载指示器；已有位图或图片已加载则不动。
+- (void)mw_showLoadingIndicatorIfNeeded {
+    if (_photoImageView.image) return;
+    if (_photo && [_photo underlyingImage]) return;
+    [self showLoadingIndicator];
+}
+
 - (void)showLoadingIndicator {
     // UIScrollView 的缩放比例必须为正数；0 会触发
     // _clampedZoomScale:allowRubberbanding: 的系统警告。
@@ -268,81 +270,79 @@
 - (CGFloat)initialZoomScaleWithMinScale {
     CGFloat zoomScale = self.minimumZoomScale;
     if (_photoImageView && _photoBrowser.zoomPhotosToFill) {
-        // Zoom image to fill if the aspect ratios are fairly similar
+        // 长宽比接近时按填充放大
         CGSize boundsSize = self.bounds.size;
         CGSize imageSize = _photoImageView.image.size;
         if (boundsSize.width <= 0 || boundsSize.height <= 0 || imageSize.width <= 0 || imageSize.height <= 0) return zoomScale;
         CGFloat boundsAR = boundsSize.width / boundsSize.height;
         CGFloat imageAR = imageSize.width / imageSize.height;
-        CGFloat xScale = boundsSize.width / imageSize.width;    // the scale needed to perfectly fit the image width-wise
-        CGFloat yScale = boundsSize.height / imageSize.height;  // the scale needed to perfectly fit the image height-wise
-        // Zooms standard portrait images on a 3.5in screen but not on a 4in screen.
+        CGFloat xScale = boundsSize.width / imageSize.width;
+        CGFloat yScale = boundsSize.height / imageSize.height;
+        // 仅在比例接近时放大，避免长图被过度拉伸
         if (ABS(boundsAR - imageAR) < 0.17) {
             zoomScale = MAX(xScale, yScale);
-            // Ensure we don't zoom in or out too far, just in case
+            // 限制在 min/max 区间内
             zoomScale = MIN(MAX(self.minimumZoomScale, zoomScale), self.maximumZoomScale);
         }
     }
     return zoomScale;
 }
 
+/// 按当前 bounds 重算最小/最大缩放与初始缩放
 - (void)setMaxMinZoomScalesForCurrentBounds {
-    
-    // Reset
+
+    // 先重置缩放
     self.minimumZoomScale = 1;
     self.maximumZoomScale = 1;
     self.zoomScale = 1;
-    
-    // Bail if no image
+
+    // 无图直接返回
     if (_photoImageView.image == nil) return;
-    
-    // Reset position
+
+    // 复位图片视图位置
     _photoImageView.frame = CGRectMake(0, 0, _photoImageView.frame.size.width, _photoImageView.frame.size.height);
-	
-    // Sizes
+
+    // 取容器与图片尺寸
     CGSize boundsSize = self.bounds.size;
     CGSize imageSize = _photoImageView.image.size;
     // 首次布局或旋转过程中 bounds 可能暂时为零，保留上面的 1 倍安全值。
     if (boundsSize.width <= 0 || boundsSize.height <= 0 || imageSize.width <= 0 || imageSize.height <= 0) return;
-    
-    // Calculate Min
-    CGFloat xScale = boundsSize.width / imageSize.width;    // the scale needed to perfectly fit the image width-wise
-    CGFloat yScale = boundsSize.height / imageSize.height;  // the scale needed to perfectly fit the image height-wise
-    CGFloat minScale = MIN(xScale, yScale);                 // use minimum of these to allow the image to become fully visible
-    
-    // Calculate Max
+
+    // 最小缩放：取宽高适配的较小值，保证整图可见
+    CGFloat xScale = boundsSize.width / imageSize.width;
+    CGFloat yScale = boundsSize.height / imageSize.height;
+    CGFloat minScale = MIN(xScale, yScale);
+
+    // 最大缩放
     CGFloat maxScale = 3;
     if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
-        // Let them go a bit bigger on a bigger screen!
+        // iPad 允许更大倍数
         maxScale = 4;
     }
-    
-    // Image is smaller than screen so no zooming!
+
+    // 图片小于屏幕时不需放大，最小缩放归 1
     if (xScale >= 1 && yScale >= 1) {
         minScale = 1.0;
     }
-    
-    // Set min/max zoom
+
+    // 应用 min/max 缩放
     self.maximumZoomScale = maxScale;
     self.minimumZoomScale = minScale;
-    
-    // Initial zoom
+
+    // 初始缩放
     self.zoomScale = [self initialZoomScaleWithMinScale];
-    
-    // If we're zooming to fill then centralise
+
+    // 填充放大时居中
     if (self.zoomScale != minScale) {
-        
-        // Centralise
+
         self.contentOffset = CGPointMake((imageSize.width * self.zoomScale - boundsSize.width) / 2.0,
                                          (imageSize.height * self.zoomScale - boundsSize.height) / 2.0);
 
     }
-    
-    // Disable scrolling initially until the first pinch to fix issues with swiping on an initally zoomed in photo
-    self.scrollEnabled = NO;
-    
 
-    // Layout
+    // 首次捏合前禁用滚动，避免初始放大态被误滑
+    self.scrollEnabled = NO;
+
 	[self setNeedsLayout];
 
 }
@@ -350,11 +350,11 @@
 #pragma mark - Layout
 
 - (void)layoutSubviews {
-	
-	// Update tap view frame
+
+	// 背景点击视图铺满
 	_tapView.frame = self.bounds;
-	
-	// Position indicators (centre does not seem to work!)
+
+	// 居中摆放指示器与失败图
 	if (!_loadingIndicator.hidden)
         [self centerLoadingIndicator];
 	if (_loadingError)
@@ -363,31 +363,29 @@
                                          _loadingError.frame.size.width,
                                          _loadingError.frame.size.height);
 
-	// Super
 	[super layoutSubviews];
-	
-    // Center the image as it becomes smaller than the size of the screen
+
+    // 图片小于屏幕时居中显示
     CGSize boundsSize = self.bounds.size;
     CGRect frameToCenter = _photoImageView.frame;
-    
-    // Horizontally
+
+    // 水平居中
     if (frameToCenter.size.width < boundsSize.width) {
         frameToCenter.origin.x = floorf((boundsSize.width - frameToCenter.size.width) / 2.0);
 	} else {
         frameToCenter.origin.x = 0;
 	}
-    
-    // Vertically
+
+    // 垂直居中
     if (frameToCenter.size.height < boundsSize.height) {
         frameToCenter.origin.y = floorf((boundsSize.height - frameToCenter.size.height) / 2.0);
 	} else {
         frameToCenter.origin.y = 0;
 	}
-    
-	// Center
+
 	if (!CGRectEqualToRect(_photoImageView.frame, frameToCenter))
 		_photoImageView.frame = frameToCenter;
-	
+
 }
 
 #pragma mark - UIScrollViewDelegate
@@ -447,15 +445,15 @@
 	// 取消排队中的单击切换显隐（双击缩放后不应再闪一次工具栏）
 	[_photoBrowser cancelPendingTapToggle];
 	
-	// Zoom
+	// 双击切换缩放
 	if (self.zoomScale != self.minimumZoomScale && self.zoomScale != [self initialZoomScaleWithMinScale]) {
-		
-		// Zoom out
+
+		// 已放大则缩回最小
 		[self setZoomScale:self.minimumZoomScale animated:YES];
 		
 	} else {
 		
-		// Zoom in to twice the size
+		// 未放大则取居中倍率，把触点放大到屏幕中心
         CGFloat newZoomScale = ((self.maximumZoomScale + self.minimumZoomScale) / 2);
         CGFloat xsize = self.bounds.size.width / newZoomScale;
         CGFloat ysize = self.bounds.size.height / newZoomScale;
@@ -463,22 +461,22 @@
 
 	}
 	
-	// Delay controls
+	// 重置控件隐藏计时
 	[_photoBrowser hideControlsAfterDelay];
 	
 }
 
-// Image View
-- (void)imageView:(UIImageView *)imageView singleTapDetected:(UITouch *)touch { 
+// 图片视图点击回调
+- (void)imageView:(UIImageView *)imageView singleTapDetected:(UITouch *)touch {
     [self handleSingleTap:[touch locationInView:imageView]];
 }
 - (void)imageView:(UIImageView *)imageView doubleTapDetected:(UITouch *)touch {
     [self handleDoubleTap:[touch locationInView:imageView]];
 }
 
-// Background View
+// 背景视图点击回调
 - (void)view:(UIView *)view singleTapDetected:(UITouch *)touch {
-    // Translate touch location to image view location
+    // 把点击点换算到图片坐标（考虑缩放与内容偏移）
     CGFloat touchX = [touch locationInView:view].x;
     CGFloat touchY = [touch locationInView:view].y;
     touchX *= 1/self.zoomScale;
@@ -488,7 +486,7 @@
     [self handleSingleTap:CGPointMake(touchX, touchY)];
 }
 - (void)view:(UIView *)view doubleTapDetected:(UITouch *)touch {
-    // Translate touch location to image view location
+    // 把点击点换算到图片坐标（考虑缩放与内容偏移）
     CGFloat touchX = [touch locationInView:view].x;
     CGFloat touchY = [touch locationInView:view].y;
     touchX *= 1/self.zoomScale;

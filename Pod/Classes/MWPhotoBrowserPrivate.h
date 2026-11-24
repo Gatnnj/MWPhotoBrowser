@@ -1,9 +1,11 @@
 //
-//  MWPhotoBrowser_Private.h
+//  MWPhotoBrowserPrivate.h
 //  MWPhotoBrowser
 //
-//  Created by Michael Waterfall on 08/10/2013.
+//  库内部共享声明，仅供主实现与各 Category 使用。
+//  不属于公开契约，子类请改用 MWPhotoBrowserSubclassing.h。
 //
+//  Created by Michael Waterfall on 08/10/2013.
 //
 
 #import <UIKit/UIKit.h>
@@ -18,43 +20,45 @@
 #define PADDING 10
 #endif
 
-// Declare private methods of browser
-// 遵循 UIViewControllerTransitioningDelegate 以提供自定义丝滑转场
+NS_ASSUME_NONNULL_BEGIN
+
+/// 主实现私有的实例变量与状态。
 @interface MWPhotoBrowser () <UIViewControllerTransitioningDelegate, UIGestureRecognizerDelegate> {
-    
-	// Data
+
+    // 数据
     NSUInteger _photoCount;
     NSMutableArray *_photos;
     NSMutableArray *_thumbPhotos;
-	NSArray<id<MWPhoto>> *_fixedPhotosArray; // Provided via init
-	
-	// Views
-	UIScrollView *_pagingScrollView;
-	
-	// Paging & layout
-	NSMutableSet *_visiblePages, *_recycledPages;
-	NSUInteger _currentPageIndex;
+    NSArray<id<MWPhoto>> *_fixedPhotosArray;
+
+    // 视图
+    UIScrollView *_pagingScrollView;
+
+    // 分页与布局
+    NSMutableSet *_visiblePages, *_recycledPages;
+    NSUInteger _currentPageIndex;
     NSUInteger _previousPageIndex;
     CGRect _previousLayoutBounds;
-	NSUInteger _pageIndexBeforeRotation;
-	
-	// Navigation & controls
+    NSUInteger _pageIndexBeforeRotation;
+
+    // 导航与控件
     MWToolBar *_toolbar;
-	NSTimer *_controlVisibilityTimer;
-    dispatch_block_t _pendingTapToggleBlock; // 排队中的单击切换显隐，可被双击或退出取消
-    
-    // Grid
+    NSTimer *_controlVisibilityTimer;
+    dispatch_block_t _pendingTapToggleBlock;
+
+    // 网格
     MWGridViewController *_gridController;
     UIBarButtonItem *_gridPreviousLeftNavItem;
     UIPanGestureRecognizer *_gridDismissPanGesture;
     BOOL _gridTransitioning;
+    BOOL _isShowingGrid;
+    BOOL _hasPickedFromGrid;
     BOOL _pendingReloadData;
-    
-    // Appearance
+
+    // 外观
     BOOL _previousNavBarHidden;
     BOOL _previousNavBarTranslucent;
     UIBarStyle _previousNavBarStyle;
-    // _previousStatusBarStyle 已移除：现代状态栏机制下无需手动保存/恢复样式
     UIColor *_previousNavBarTintColor;
     UIColor *_previousNavBarBarTintColor;
     UIImage *_previousNavigationBarBackgroundImageDefault;
@@ -62,92 +66,144 @@
     UINavigationBarAppearance *_previousNavBarScrollEdgeAppearance;
     UINavigationBarAppearance *_previousNavBarCompactAppearance;
     UINavigationBarAppearance *_previousNavBarCompactScrollEdgeAppearance;
-    // _previousNavigationBarBackgroundImageLandscapePhone 已移除：iOS 8 后横屏使用统一 metrics
 
-    
-    // Misc
+    // 其他状态
     BOOL _hasBelongedToViewController;
-    // _isVCBasedStatusBarAppearance 已移除：iOS 13 起状态栏外观统一由 VC 管理
     BOOL _statusBarShouldBeHidden;
     BOOL _leaveStatusBarAlone;
-	BOOL _performingLayout;
-	BOOL _rotating;
-    BOOL _viewIsActive; // active as in it's in the view heirarchy
+    BOOL _performingLayout;
+    BOOL _rotating;
+    BOOL _viewIsActive;
     BOOL _didSavePreviousStateOfNavBar;
     BOOL _skipNextPagingScrollViewPositioning;
     BOOL _viewHasAppearedInitially;
-    CGPoint _currentGridContentOffset;
-    
+
+    // 预加载调度：档位缓存（滞回）与内存警告冷却截止时间
+    NSUInteger _preloadCountCache;
+    NSTimeInterval _preloadSuppressedUntil;
 }
 
-// Properties
-// 自定义转场的交互控制器（拖拽关闭），启用丝滑转场时创建
-@property (nonatomic, strong) MWPhotoInteractiveTransition *interactiveTransition;
+/// 拖拽关闭交互控制器，仅在启用自定义转场时创建。
+@property (nonatomic, strong, nullable) MWPhotoInteractiveTransition *interactiveTransition;
 
-// Layout
-- (void)layoutVisiblePages;
+/// 网格状态的内部可写版本：公开头对外只读，由网格流程与选中回调写入。
+@property (nonatomic, readwrite) BOOL hasPickedFromGrid;
+@property (nonatomic, readwrite) BOOL isShowingGrid;
+
+// 由主实现提供
+/// 重新计算并摆放所有可见页
 - (void)performLayout;
-- (BOOL)presentingViewControllerPrefersStatusBarHidden;
-- (UIView *)mw_startingView;
-- (void)handleGridDismissPan:(UIPanGestureRecognizer *)pan;
-
-// Nav Bar Appearance
-- (void)setNavBarAppearance:(BOOL)animated;
-- (void)storePreviousNavBarAppearance;
-- (void)restorePreviousNavBarAppearance:(BOOL)animated;
-
-// Paging
-- (void)tilePages;
-- (BOOL)isDisplayingPageForIndex:(NSUInteger)index;
-- (MWZoomingScrollView *)pageDisplayedAtIndex:(NSUInteger)index;
-- (MWZoomingScrollView *)pageDisplayingPhoto:(id<MWPhoto>)photo;
-- (MWZoomingScrollView *)dequeueRecycledPage;
-- (void)configurePage:(MWZoomingScrollView *)page forIndex:(NSUInteger)index;
-- (void)didStartViewingPageAtIndex:(NSUInteger)index;
-
-// Frames
-- (CGRect)frameForPagingScrollView;
-- (CGRect)frameForPageAtIndex:(NSUInteger)index;
-- (CGSize)contentSizeForPagingScrollView;
-- (CGPoint)contentOffsetForPageAtIndex:(NSUInteger)index;
-- (UIInterfaceOrientation)mw_currentInterfaceOrientation;
-- (CGRect)frameForToolbarAtOrientation:(UIInterfaceOrientation)orientation;
-
-// Navigation
-- (void)updateNavigation;
-- (void)jumpToPageAtIndex:(NSUInteger)index animated:(BOOL)animated;
-- (void)gotoPreviousPage;
-- (void)gotoNextPage;
-
-// Grid
-- (void)showGridAnimated;
-- (void)showGrid:(BOOL)animated;
-- (void)hideGrid;
-
-// Misc
-- (void)doneButtonPressed:(id)sender;
+/// 完成按钮响应：关闭浏览器或在网格/单图间切换
+- (void)doneButtonPressed:(nullable id)sender;
+/// 配置自定义工具栏按钮
 - (void)customToolBarItems:(NSArray<UIButton *> *)array;
-- (void)handleMWPhotoLoadingDidEndNotification:(NSNotification *)notification;
-- (void)showPreviousPhotoAnimated:(BOOL)animated;
-- (void)showNextPhotoAnimated:(BOOL)animated;
-
-// Controls
-- (void)cancelControlHiding;
-- (void)hideControlsAfterDelay;
-- (void)setControlsHidden:(BOOL)hidden animated:(BOOL)animated permanent:(BOOL)permanent;
-- (void)toggleControls;
-- (BOOL)areControlsHidden;
-// 单击延迟切换控件显隐（可被双击 / 退出页面取消）
-- (void)scheduleToggleControlsFromTap;
-- (void)cancelPendingTapToggle;
-
-// Data
-- (NSUInteger)numberOfPhotos;
-- (nullable id<MWPhoto>)photoAtIndex:(NSUInteger)index;
-- (nullable id<MWPhoto>)thumbPhotoAtIndex:(NSUInteger)index;
-- (UIImage *)imageForPhoto:(id<MWPhoto>)photo;
-- (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo;
-- (void)releaseAllUnderlyingPhotos:(BOOL)preserveCurrent;
 
 @end
 
+/// 由各 Category 提供的内部方法。
+///
+/// 声明在分类而非类扩展中，避免每个 .m 都触发 -Wincomplete-implementation。
+@interface MWPhotoBrowser (MWInternal)
+
+// 布局 —— MWPhotoBrowser+Layout
+/// 重新摆放当前可见页
+- (void)layoutVisiblePages;
+/// 分页滚动视图的 frame
+- (CGRect)frameForPagingScrollView;
+/// 指定索引图片页的 frame
+- (CGRect)frameForPageAtIndex:(NSUInteger)index;
+/// 分页滚动视图的内容尺寸
+- (CGSize)contentSizeForPagingScrollView;
+/// 指定索引页对应的内容偏移
+- (CGPoint)contentOffsetForPageAtIndex:(NSUInteger)index;
+/// 当前界面方向
+- (UIInterfaceOrientation)mw_currentInterfaceOrientation;
+/// 指定方向下工具栏的 frame
+- (CGRect)frameForToolbarAtOrientation:(UIInterfaceOrientation)orientation;
+
+// 分页 —— MWPhotoBrowser+Paging
+/// 按可见范围创建、复用并摆放图片页
+- (void)tilePages;
+/// 指定索引是否已有可见页
+- (BOOL)isDisplayingPageForIndex:(NSUInteger)index;
+/// 取指定索引正在显示的页
+- (nullable MWZoomingScrollView *)pageDisplayedAtIndex:(NSUInteger)index;
+/// 取展示指定图片对象的页
+- (nullable MWZoomingScrollView *)pageDisplayingPhoto:(id<MWPhoto>)photo;
+/// 从复用池取一个可复用页
+- (nullable MWZoomingScrollView *)dequeueRecycledPage;
+/// 绑定页的 frame、索引与图片
+- (void)configurePage:(MWZoomingScrollView *)page forIndex:(NSUInteger)index;
+/// 某页开始显示时回调
+- (void)didStartViewingPageAtIndex:(NSUInteger)index;
+
+// 数据 —— MWPhotoBrowser+Data
+/// 图片总数（优先代理，其次固定数组）
+- (NSUInteger)numberOfPhotos;
+/// 取指定索引的图片对象，必要时懒加载
+- (nullable id<MWPhoto>)photoAtIndex:(NSUInteger)index;
+/// 取指定索引的缩略图对象
+- (nullable id<MWPhoto>)thumbPhotoAtIndex:(NSUInteger)index;
+/// 取图片对象当前已就绪的 UIImage
+- (nullable UIImage *)imageForPhoto:(id<MWPhoto>)photo;
+/// 返回当前进程内存预算允许的每侧预加载页数（0 到 2）。
+- (NSUInteger)adjacentPhotoPreloadCount;
+/// 按内存预算预加载当前页相邻图片。
+- (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo;
+/// 同上方方法，使用调用方已采样的档位，避免一次翻页内重复读数导致窗口不一致。
+- (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo preloadCount:(NSUInteger)preloadCount;
+/// 释放所有图片底层数据，可保留当前页
+- (void)releaseAllUnderlyingPhotos:(BOOL)preserveCurrent;
+/// 处理图片加载完成通知，刷新对应页
+- (void)handleMWPhotoLoadingDidEndNotification:(NSNotification *)notification;
+
+// 导航 —— MWPhotoBrowser+Navigation
+/// 更新导航栏按钮与标题状态
+- (void)updateNavigation;
+/// 跳转到指定索引页
+- (void)jumpToPageAtIndex:(NSUInteger)index animated:(BOOL)animated;
+/// 上一页
+- (void)gotoPreviousPage;
+/// 下一页
+- (void)gotoNextPage;
+
+// 网格 —— MWPhotoBrowser+Grid
+// showGrid: 与 showGridAnimated 已在公开头声明，供外部调用
+/// 关闭网格并回到单图浏览
+- (void)hideGrid;
+/// 网格拖拽关闭手势处理
+- (void)handleGridDismissPan:(UIPanGestureRecognizer *)pan;
+
+// 控件显隐 —— MWPhotoBrowser+Controls
+/// 取消待执行的自动隐藏
+- (void)cancelControlHiding;
+/// 延迟后自动隐藏控件
+- (void)hideControlsAfterDelay;
+/// 设置导航栏与工具栏显隐
+- (void)setControlsHidden:(BOOL)hidden animated:(BOOL)animated permanent:(BOOL)permanent;
+/// 切换控件显隐
+- (void)toggleControls;
+/// 控件当前是否隐藏
+- (BOOL)areControlsHidden;
+/// 点击后延迟触发控件切换（合并单击双击时序）
+- (void)scheduleToggleControlsFromTap;
+/// 取消待执行的点击切换
+- (void)cancelPendingTapToggle;
+
+// 导航栏外观 —— MWPhotoBrowser+NavBar
+/// 应用导航栏外观
+- (void)setNavBarAppearance:(BOOL)animated;
+/// 记录进入前的导航栏外观
+- (void)storePreviousNavBarAppearance;
+/// 恢复进入前的导航栏外观
+- (void)restorePreviousNavBarAppearance:(BOOL)animated;
+/// 状态栏是否应由呈现方隐藏
+- (BOOL)presentingViewControllerPrefersStatusBarHidden;
+
+// 转场 —— MWPhotoBrowser+Transition
+/// 解析当前页转场起始缩略图
+- (nullable UIView *)mw_startingView;
+
+@end
+
+NS_ASSUME_NONNULL_END

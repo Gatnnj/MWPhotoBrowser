@@ -17,17 +17,27 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface MWZoomingScrollView : UIScrollView <UIScrollViewDelegate, MWTapDetectingImageViewDelegate, MWTapDetectingViewDelegate>
 
+/// 当前页索引
 @property () NSUInteger index;
+/// 当前展示的图片对象
 @property (nonatomic, nullable) id <MWPhoto> photo;
 
+/// 绑定所属浏览器初始化
 - (instancetype)initWithPhotoBrowser:(MWPhotoBrowser *)browser;
+/// 刷新并显示当前图片
 - (void)displayImage;
+/// 显示加载失败占位图
 - (void)displayImageFailure;
+/// 当前无位图且未就绪时补显示加载指示器（页面尚未经过 setPhoto 配置时的兜底）
+- (void)mw_showLoadingIndicatorIfNeeded;
+/// 按当前 bounds 计算最大/最小缩放比例
 - (void)setMaxMinZoomScalesForCurrentBounds;
+/// 复用时清理状态
 - (void)prepareForReuse;
+/// 隐藏或显示图片视图（转场过渡用）
 - (void)setImageHidden:(BOOL)hidden;
 
-/// Rebinds refreshed photo data without clearing the currently visible image.
+/// 重新绑定刷新后的图片数据，同时保留当前已可见的图片。
 - (void)reloadPhotoKeepingDisplayedImage:(nullable id<MWPhoto>)photo;
 
 // 暴露所属浏览器，供交互控制器复位时重算布局

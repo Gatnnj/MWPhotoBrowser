@@ -11,7 +11,6 @@
 #import "SDWebImage.h"
 #endif
 #import "MWPhotoBrowser.h"
-#import "MWCommon.h"
 
 #import "YBImageBrowser/YBImageBrowser.h"
 
@@ -86,6 +85,7 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 @property (nonatomic, strong) NSArray<NSString *> *imageURLStrings;
 @property (nonatomic, strong) MWWaterfallLayout *waterfallLayout;
 @property (nonatomic, strong) NSMutableArray<MWPhoto *> *photos;
+@property (nonatomic, weak) MWPhotoBrowser *activePhotoBrowser;
 
 // 丝滑转场演示专用：在窗口上放置一个缩略图作为连贯动画的起点
 @property (nonatomic, weak) UIImageView *demoSourceImageView;
@@ -179,6 +179,10 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
     self.collectionView.alwaysBounceVertical = YES;
     [self.collectionView registerClass:[MWWaterfallCell class]
             forCellWithReuseIdentifier:kMWWaterfallCellReuseID];
+    
+    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
+
+    }];
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -211,12 +215,8 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 #pragma mark - UICollectionViewDelegate
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    //    [[SDImageCache sharedImageCache] clearDiskOnCompletion:^{
-    //
-    //    }];
-    
     // 数据数组
-    NSArray<NSString *> *urls = @[
+    NSArray<NSString *> *tmpArray = @[
         @"https://picsum.photos/id/1015/3840/2560",
         @"https://picsum.photos/id/1016/3840/2560",
         @"https://picsum.photos/id/1020/3840/2560",
@@ -233,6 +233,11 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
         @"https://picsum.photos/id/1039/2560/3840",
         @"https://picsum.photos/id/1023/3000/3000",
     ];
+    
+    NSMutableArray *urls = [NSMutableArray arrayWithArray:tmpArray];
+    [urls addObjectsFromArray:[tmpArray copy]];
+    [urls addObjectsFromArray:[tmpArray copy]];
+    [urls addObjectsFromArray:[tmpArray copy]];
     
     MWWaterfallCell *cell = (MWWaterfallCell *)[collectionView cellForItemAtIndexPath:indexPath];
     if (cell.imageView.image == nil) {
@@ -291,8 +296,35 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
     MWPhotoBrowser *browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
     browser.enableCustomTransition = YES;
     browser.enableGrid = YES;
-    browser.startOnGrid = NO;
     [browser setCurrentPhotoIndex:0];
+
+    // 底部四按钮工具栏示例：前三个仅展示自定义图标，最右侧关闭图片浏览器。
+    NSArray<NSString *> *symbolNames = @[@"heart", @"square.and.arrow.up", @"info.circle", @"xmark"];
+    NSArray<NSString *> *accessibilityLabels = @[@"收藏", @"分享", @"信息", @"关闭"];
+    NSMutableArray<UIButton *> *toolbarButtons = [NSMutableArray arrayWithCapacity:symbolNames.count];
+    self.activePhotoBrowser = browser;
+    [symbolNames enumerateObjectsUsingBlock:^(NSString *symbolName, NSUInteger index, BOOL *stop) {
+        (void)stop;
+        UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+        UIImageSymbolConfiguration *symbolConfiguration =
+            [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightRegular];
+        [button setImage:[UIImage systemImageNamed:symbolName withConfiguration:symbolConfiguration]
+                forState:UIControlStateNormal];
+        button.tintColor = UIColor.whiteColor;
+        button.accessibilityLabel = accessibilityLabels[index];
+        if (index == symbolNames.count - 2) {
+            [button addTarget:self action:@selector(showGridVc)
+             forControlEvents:UIControlEventTouchUpInside];
+        }
+        
+        if (index == symbolNames.count - 1) {
+            [button addTarget:self action:@selector(closePhotoBrowserFromToolbar)
+             forControlEvents:UIControlEventTouchUpInside];
+        }
+        [toolbarButtons addObject:button];
+    }];
+    [browser customToolBarItems:toolbarButtons];
+    [browser customToolBarPosition:MWToolBarPositionBottom];
     
     // 4. 使用 OverFullScreen 保留底层列表，拖拽时才能透出背景
     UINavigationController *nc = [[UINavigationController alloc] initWithRootViewController:browser];
@@ -301,6 +333,20 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
     nc.view.opaque = NO;
     nc.transitioningDelegate = browser;
     [self presentViewController:nc animated:YES completion:nil];
+}
+
+- (void)showGridVc {
+    MWPhotoBrowser *browser = self.activePhotoBrowser;
+    if (browser) {
+        [browser showGridAnimated];
+    }
+}
+
+- (void)closePhotoBrowserFromToolbar {
+    MWPhotoBrowser *browser = self.activePhotoBrowser;
+    if (browser) {
+        [self photoBrowserDidFinishModalPresentation:browser];
+    }
 }
 
 #pragma mark - MWPhotoBrowserDelegate
@@ -322,16 +368,10 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 }
 
 - (id <MWPhoto>)photoBrowser:(MWPhotoBrowser *)photoBrowser thumbPhotoAtIndex:(NSUInteger)index {
-//    if (index < _thumbs.count)
-//        return [_thumbs objectAtIndex:index];
+    if (index < _photos.count)
+        return [_photos objectAtIndex:index];
     return nil;
 }
-
-//- (MWCaptionView *)photoBrowser:(MWPhotoBrowser *)photoBrowser captionViewForPhotoAtIndex:(NSUInteger)index {
-//    MWPhoto *photo = [self.photos objectAtIndex:index];
-//    MWCaptionView *captionView = [[MWCaptionView alloc] initWithPhoto:photo];
-//    return [captionView autorelease];
-//}
 
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser didDisplayPhotoAtIndex:(NSUInteger)index {
     NSLog(@"Did start viewing photo at index %lu", (unsigned long)index);
@@ -340,10 +380,7 @@ static CGFloat MWImageAspectRatioFromURLString(NSString *urlString) {
 - (void)photoBrowserDidFinishModalPresentation:(MWPhotoBrowser *)photoBrowser {
     // If we subscribe to this method we must dismiss the view controller ourselves
     NSLog(@"Did finish modal presentation");
-    UIImageView *demoSource = self.demoSourceImageView;
     [self dismissViewControllerAnimated:YES completion:^{
-        // 关闭动画结束后移除演示用的缩略图源视图
-        [demoSource removeFromSuperview];
     }];
 }
 

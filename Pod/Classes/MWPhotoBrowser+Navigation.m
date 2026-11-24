@@ -12,7 +12,6 @@
 
 - (void)updateNavigation {
 
-    // Title
     NSUInteger numberOfPhotos = [self numberOfPhotos];
     if (_gridController) {
         {
@@ -31,14 +30,18 @@
 
 - (void)jumpToPageAtIndex:(NSUInteger)index animated:(BOOL)animated {
 
-    // Change page
+    // 越界则不跳转
     if (index < [self numberOfPhotos]) {
         CGRect pageFrame = [self frameForPageAtIndex:index];
         [_pagingScrollView setContentOffset:CGPointMake(pageFrame.origin.x - PADDING, 0) animated:animated];
+        // 非动画跳转不触发 scrollViewDidScroll，手动补铺页并触发当前页加载，避免黑屏
+        if (!_performingLayout) [self tilePages];
+        id<MWPhoto> photo = [self photoAtIndex:index];
+        if (photo && ![photo underlyingImage]) [photo loadUnderlyingImageAndNotify];
         [self updateNavigation];
     }
 
-    // Update timer to give more time
+    // 翻页后重置控件自动隐藏计时，给用户更多停留时间
     [self hideControlsAfterDelay];
 
 }

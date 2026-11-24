@@ -10,6 +10,7 @@
 #import "MWPhotoTransitionAnimator.h"
 #import <QuartzCore/QuartzCore.h>
 
+/// 取过渡图片：UIImageView 直接取 image，否则渲染图层快照
 static UIImage *MWTransitionSnapshot(UIView *view) {
     if ([view isKindOfClass:UIImageView.class]) {
         UIImage *image = ((UIImageView *)view).image;
@@ -44,8 +45,7 @@ static UIImage *MWTransitionSnapshot(UIView *view) {
     animator.dismissing = NO;
     UIView *startView = [self mw_startingView];
     animator.startView = startView;
-    // YBImageBrowser supports both UIImageView sources and snapshots of other
-    // projected views; use the same fallback so the coherent flight can run.
+    // 同时支持 UIImageView 起点与其它投影视图快照，保证连贯飞行可走兜底
     animator.transitionImage = MWTransitionSnapshot(startView);
     return animator;
 }

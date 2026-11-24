@@ -13,9 +13,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface MWGridViewController : UICollectionViewController {}
 
+/// 所属浏览器（弱引用）
 @property (nonatomic, assign, nullable) MWPhotoBrowser *browser;
-@property (nonatomic) CGPoint initialContentOffset;
 
+/// 由浏览器在网格挂载后调用一次，把当前大图对应的格子居中显示。
 - (void)adjustOffsetsAsRequired;
 
 @end

@@ -156,13 +156,12 @@ static char customImageName;
     return [self mwCompressImage:image withMask:nil];
 }
 
+/// 鲁班式分级压缩：按宽高比与像素高度选缩放倍数和目标大小，再交给压缩方法
 + (NSData *)mwCompressImage:(UIImage *)image withMask:(NSString *)maskName {
     
     double size;
     NSData *imageData = UIImageJPEGRepresentation(image, 1);
-    
-//    NSLog(@"Luban-iOS image data size before compressed == %f Kb",imageData.length/1024.0);
-    
+
     int fixelW = (int)image.size.width;
     int fixelH = (int)image.size.height;
     int thumbW = fixelW % 2  == 1 ? fixelW + 1 : fixelW;
@@ -221,6 +220,7 @@ static char customImageName;
     return [self compressWithImage:image thumbW:thumbW thumbH:thumbH size:size withMask:maskName];
 }
 
+/// 记录自定义图片水印名后走默认压缩流程
 + (NSData *)mwCompressImage:(UIImage *)image withCustomImage:(NSString *)imageName {
     
     if (imageName) {
@@ -230,6 +230,7 @@ static char customImageName;
     return [self mwCompressImage:image withMask:nil];
 }
 
+/// 先缩放叠水印，再从低质量逐步提升 JPEG 质量直到达到目标大小
 + (NSData *)compressWithImage:(UIImage *)image thumbW:(int)width thumbH:(int)height size:(double)size withMask:(NSString *)maskName {
     
     UIImage *thumbImage = [image fixOrientation];
@@ -248,11 +249,10 @@ static char customImageName;
         lenght       = imageData.length;
         thumbImage   = [UIImage imageWithData:imageData];
     }
-//    NSLog(@"Luban-iOS image data size after compressed ==%f kb",imageData.length/1024.0);
     return imageData;
 }
 
-// specify the size
+/// 按目标尺寸等比缩放，并叠加文字或图片水印
 - (UIImage *)resizeImage:(UIImage *)image thumbWidth:(int)width thumbHeight:(int)height withMask:(NSString *)maskName {
     
     int outW = (int)image.size.width;
@@ -268,14 +268,14 @@ static char customImageName;
             inSampleSize *= 2;
         }
     }
-    // keep one decimal
+    // 按宽高比取较大者修正采样率（保留一位小数）
     int outWith  = (int)((outW / (float) width)*10);
     int outHeiht = (int)((outH / (float) height)*10);
     float heightRatio = outHeiht/10.0;
     float widthRatio  = outWith/10.0;
-    
+
     if (heightRatio > 1 || widthRatio > 1) {
-        
+
         inSampleSize = heightRatio > widthRatio ? heightRatio : widthRatio;
     }
     CGSize thumbSize = CGSizeMake((NSUInteger)((CGFloat)(outW/inSampleSize)), (NSUInteger)((CGFloat)(outH/inSampleSize)));
@@ -311,13 +311,12 @@ static char customImageName;
     return resultImage;
 }
 
+/// 把带方向元数据的图片转正为 Up；方向已正确则原样返回
 - (UIImage *)fixOrientation {
-    
-    // No-op if the orientation is already correct
+
     if (self.imageOrientation == UIImageOrientationUp) return self;
-    
-    // We need to calculate the proper transformation to make the image upright.
-    // We do it in 2 steps: Rotate if Left/Right/Down, and then flip if Mirrored.
+
+    // 先按方向旋转，再按需镜像，得到正立的变换矩阵
     CGAffineTransform transform = CGAffineTransformIdentity;
     
     switch (self.imageOrientation) {
@@ -362,8 +361,7 @@ static char customImageName;
             break;
     }
     
-    // Now we draw the underlying CGImage into a new context, applying the transform
-    // calculated above.
+    // 把 CGImage 按变换画进新位图上下文
     CGContextRef ctx = CGBitmapContextCreate(NULL, self.size.width, self.size.height,
                                              CGImageGetBitsPerComponent(self.CGImage), 0,
                                              CGImageGetColorSpace(self.CGImage),
@@ -374,7 +372,6 @@ static char customImageName;
         case UIImageOrientationLeftMirrored:
         case UIImageOrientationRight:
         case UIImageOrientationRightMirrored:
-            // Grr...
             CGContextDrawImage(ctx, CGRectMake(0,0,self.size.height,self.size.width), self.CGImage);
             break;
             
@@ -383,7 +380,7 @@ static char customImageName;
             break;
     }
     
-    // And now we just create a new UIImage from the drawing context
+    // 从位图上下文生成新 UIImage
     CGImageRef cgimg = CGBitmapContextCreateImage(ctx);
     UIImage *img = [UIImage imageWithCGImage:cgimg];
     CGContextRelease(ctx);
@@ -391,30 +388,19 @@ static char customImageName;
     return img;
 }
 
+/// 按错位网格平铺绘制斜向文字水印
 - (void) drawMaskWithString:(NSString *)str context:(CGContextRef)context radius:(CGFloat)radius angle:(CGFloat)angle colour:(UIColor *)colour font:(UIFont *)font slantAngle:(CGFloat)slantAngle size:(CGSize)size{
-    // *******************************************************
-    // This draws the String str centred at the position
-    // specified by the polar coordinates (r, theta)
-    // i.e. the x= r * cos(theta) y= r * sin(theta)
-    // and rotated by the angle slantAngle
-    // *******************************************************
-    
-    // Set the text attributes
+
+    // 文字属性与上下文状态
     NSDictionary *attributes = @{NSForegroundColorAttributeName:colour,
                                             NSFontAttributeName:font};
-    // Save the context
     CGContextSaveGState(context);
-    // Undo the inversion of the Y-axis (or the text goes backwards!)
+    // 翻转 Y 轴并把原点移到文字中心，再旋转坐标系
     CGContextScaleCTM(context, 1, -1);
-    // Move the origin to the centre of the text (negating the y-axis manually)
     CGContextTranslateCTM(context, radius * cos(angle), -(radius * sin(angle)));
-    // Rotate the coordinate system
     CGContextRotateCTM(context, -slantAngle);
-    // Calculate the width of the text
     CGSize offset = [str sizeWithAttributes:attributes];
-    // Move the origin by half the size of the text
-    CGContextTranslateCTM (context, -offset.width / 2, -offset.height / 2); // Move the origin to the centre of the text (negating the y-axis manually)
-    // Draw the text
+    CGContextTranslateCTM (context, -offset.width / 2, -offset.height / 2);
     
     NSInteger width  = ceil(cos(slantAngle)*offset.width);
     NSInteger height = ceil(sin(slantAngle)*offset.width);
@@ -436,7 +422,7 @@ static char customImageName;
         [str drawAtPoint:CGPointMake(xPoint, yPoint) withAttributes:attributes];
     }
     
-    // Restore the context
+    // 恢复上下文状态
     CGContextRestoreGState(context);
 }
 

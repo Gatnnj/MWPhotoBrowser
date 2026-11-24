@@ -9,12 +9,14 @@
 #import "MWGridViewController.h"
 #import "MWGridCell.h"
 #import "MWPhotoBrowserPrivate.h"
-#import "MWCommon.h"
 
 @interface MWGridViewController () {
     
-    // Store margins for current setup
+    // 记录当前布局的边距与列数
     CGFloat _margin, _gutter, _marginL, _gutterL, _columns, _columnsL;
+
+    // 本网格实例是否已应用过初始定位，防止重复居中
+    BOOL _didApplyInitialPosition;
     
 }
 
@@ -22,15 +24,14 @@
 
 @implementation MWGridViewController
 
-- (id)init {
+- (instancetype)init {
     if ((self = [super initWithCollectionViewLayout:[UICollectionViewFlowLayout new]])) {
         
-        // Defaults
+        // 默认列数与边距
         _columns = 3; _columnsL = 4;
         _margin = 0; _gutter = 1;
         _marginL = 0; _gutterL = 1;
-        
-        // For pixel perfection...
+
         if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
             // iPad
             _columns = 6; _columnsL = 8;
@@ -43,9 +44,6 @@
             _margin = 0; _gutter = 1;
             _marginL = 0; _gutterL = 2;
         }
-
-        _initialContentOffset = CGPointMake(0, CGFLOAT_MAX);
- 
     }
     return self;
 }
@@ -63,8 +61,7 @@
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
-    // Drop decoded thumbnails from the photo objects; their SDWebImage disk
-    // entries remain available if the grid is opened again.
+    // 释放可见 cell 的内存缩略图；磁盘缓存保留，再次打开仍可用
     NSArray *visibleCells = [self.collectionView visibleCells];
     if (visibleCells) {
         for (MWGridCell *cell in visibleCells) {
@@ -76,57 +73,24 @@
     [super viewWillDisappear:animated];
 }
 
-- (void)viewWillLayoutSubviews {
-    [super viewWillLayoutSubviews];
-    [self performLayout];
-}
-
-- (void)viewDidLayoutSubviews {
-    [super viewDidLayoutSubviews];
-}
-
 - (void)adjustOffsetsAsRequired {
-    BOOL hasInitialContentOffset = _initialContentOffset.y != CGFLOAT_MAX;
+    // 每个网格实例只定位一次：布局回调可能多次触发，重复居中会把用户手动滚动的位置拽回去。
+    if (_didApplyInitialPosition) return;
+    if (_browser.numberOfPhotos == 0) return;
+    _didApplyInitialPosition = YES;
 
-    // Move to the requested content offset before checking selected-photo visibility.
-    if (hasInitialContentOffset) {
-        self.collectionView.contentOffset = _initialContentOffset;
-        [self.collectionView layoutIfNeeded]; // Layout after content offset change
-    }
-    
-    // Check if current item is visible and if not, make it so!
-    // When the caller explicitly requested a position (MWPhotoBrowser resets
-    // the grid to the top for each presentation), do not scroll away from it.
-    if (!hasInitialContentOffset && _browser.numberOfPhotos > 0) {
-        NSIndexPath *currentPhotoIndexPath = [NSIndexPath indexPathForItem:_browser.currentIndex inSection:0];
-        NSArray *visibleIndexPaths = [self.collectionView indexPathsForVisibleItems];
-        BOOL currentVisible = NO;
-        for (NSIndexPath *indexPath in visibleIndexPaths) {
-            if ([indexPath isEqual:currentPhotoIndexPath]) {
-                currentVisible = YES;
-                break;
-            }
-        }
-        if (!currentVisible) {
-            [self.collectionView scrollToItemAtIndexPath:currentPhotoIndexPath atScrollPosition:UICollectionViewScrollPositionNone animated:NO];
-        }
-    }
-    
+    if (_browser.currentIndex >= _browser.numberOfPhotos) return;
+
+    // 把当前大图对应的格子居中显示。CenteredVertically 会把偏移量夹到合法区间，
+    // 所以当前照片位于首行、或内容不足一屏时，结果自然停在顶部，不会出现上方留白。
+    NSIndexPath *currentPhotoIndexPath = [NSIndexPath indexPathForItem:_browser.currentIndex inSection:0];
+    [self.collectionView scrollToItemAtIndexPath:currentPhotoIndexPath
+                               atScrollPosition:UICollectionViewScrollPositionCenteredVertically
+                                       animated:NO];
 }
-
-- (void)performLayout {
-//    UINavigationBar *navBar = self.navigationController.navigationBar;
-//    self.collectionView.contentInset = UIEdgeInsetsMake(navBar.frame.origin.y + navBar.frame.size.height + [self getGutter], 0, 0, 0);
-}
-
-//- (void)willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
-//    [self.collectionView reloadData];
-//    [self performLayout]; // needed for iOS 5 & 6
-//}
 
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id <UIViewControllerTransitionCoordinator>)coordinator {
     [self.collectionView reloadData];
-    [self performLayout]; // needed for iOS 8
 }
 
 #pragma mark - Layout
@@ -181,6 +145,8 @@
     cell.gridController = self;
     cell.photo = photo;
     cell.index = indexPath.row;
+    // 标记当前大图对应的那一格，打开网格时用户一眼能看到自己正在看哪张。
+    cell.isCurrentPhoto = (indexPath.row == _browser.currentIndex);
     if ([photo respondsToSelector:@selector(loadGridThumbnailAndNotifyWithPixelSize:)]) {
         UIImage *thumbnail = [photo respondsToSelector:@selector(gridThumbnailImage)] ? photo.gridThumbnailImage : nil;
         if (thumbnail) {
@@ -206,7 +172,8 @@
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    _browser.isShowGriding = YES;
+    // 记录"曾经从网格中点选过照片"：只置 YES，永不复位。
+    _browser.hasPickedFromGrid = YES;
     [_browser setCurrentPhotoIndex:indexPath.row];
     [_browser hideGrid];
 }

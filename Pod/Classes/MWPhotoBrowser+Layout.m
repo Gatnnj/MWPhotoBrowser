@@ -19,46 +19,44 @@
 
 - (void)layoutVisiblePages {
 
-    // Flag
+    // 标记布局进行中
     _performingLayout = YES;
 
-    // Toolbar
+    // 工具栏 frame
     _toolbar.frame = [self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]];
 
-    // Remember index
+    // 记录布局前页码，布局后保持同一页
     NSUInteger indexPriorToLayout = _currentPageIndex;
 
-    // Get paging scroll view frame to determine if anything needs changing
+    // 取分页滚动视图 frame，判断是否需要变更
     CGRect pagingScrollViewFrame = [self frameForPagingScrollView];
 
-    // Frame needs changing
     if (!_skipNextPagingScrollViewPositioning) {
         _pagingScrollView.frame = pagingScrollViewFrame;
     }
     _skipNextPagingScrollViewPositioning = NO;
 
-    // Recalculate contentSize based on current orientation
+    // 按当前方向重算 contentSize
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
 
-    // Adjust frames and configuration of each visible page
+    // 调整各可见页 frame
     for (MWZoomingScrollView *page in _visiblePages) {
         NSUInteger index = page.index;
         page.frame = [self frameForPageAtIndex:index];
 
-        // Adjust scales if bounds has changed since last time
+        // bounds 变化时重算缩放比例
         if (!CGRectEqualToRect(_previousLayoutBounds, self.view.bounds)) {
-            // Update zooms for new bounds
             [page setMaxMinZoomScalesForCurrentBounds];
             _previousLayoutBounds = self.view.bounds;
         }
 
     }
 
-    // Adjust contentOffset to preserve page location based on values collected prior to location
+    // 保持布局前所在页的偏移
     _pagingScrollView.contentOffset = [self contentOffsetForPageAtIndex:indexPriorToLayout];
     [self didStartViewingPageAtIndex:_currentPageIndex]; // initial
 
-    // Reset
+    // 复位布局标记
     _currentPageIndex = indexPriorToLayout;
     _performingLayout = NO;
 
@@ -80,7 +78,7 @@
     _pageIndexBeforeRotation = _currentPageIndex;
     _rotating = YES;
     if ([self areControlsHidden]) {
-        // Force hidden
+        // 旋转中强制隐藏导航栏
         self.navigationController.navigationBarHidden = YES;
     }
 
@@ -104,17 +102,14 @@
 #pragma mark - Frame Calculations
 
 - (CGRect)frameForPagingScrollView {
-    CGRect frame = self.view.bounds;// [[UIScreen mainScreen] bounds];
+    CGRect frame = self.view.bounds;
     frame.origin.x -= PADDING;
     frame.size.width += (2 * PADDING);
     return CGRectIntegral(frame);
 }
 
 - (CGRect)frameForPageAtIndex:(NSUInteger)index {
-    // We have to use our paging scroll view's bounds, not frame, to calculate the page placement. When the device is in
-    // landscape orientation, the frame will still be in portrait because the pagingScrollView is the root view controller's
-    // view, so its frame is in window coordinate space, which is never rotated. Its bounds, however, will be in landscape
-    // because it has a rotation transform applied.
+    // 用 bounds 而非 frame：frame 处于窗口坐标不随旋转变，bounds 才反映实际方向
     CGRect bounds = _pagingScrollView.bounds;
     CGRect pageFrame = bounds;
     pageFrame.size.width -= (2 * PADDING);
@@ -123,7 +118,7 @@
 }
 
 - (CGSize)contentSizeForPagingScrollView {
-    // We have to use the paging scroll view's bounds to calculate the contentSize, for the same reason outlined above.
+    // 同样用 bounds 计算 contentSize
     CGRect bounds = _pagingScrollView.bounds;
     return CGSizeMake(bounds.size.width * [self numberOfPhotos], bounds.size.height);
 }
@@ -148,11 +143,8 @@
 }
 
 - (CGRect)frameForToolbarAtOrientation:(UIInterfaceOrientation)orientation {
-    CGFloat width = self.view.bounds.size.width;
-    CGFloat height = 83;
-    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone &&
-        UIInterfaceOrientationIsLandscape(orientation)) height = self.view.bounds.size.width;
-    return CGRectIntegral(CGRectMake(0, self.view.bounds.size.height - height, width, height));
+    (void)orientation;
+    return CGRectIntegral([_toolbar frameForContainerBounds:self.view.bounds safeAreaInsets:self.view.safeAreaInsets]);
 }
 
 @end

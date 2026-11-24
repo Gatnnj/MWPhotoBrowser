@@ -17,7 +17,7 @@
             presenting = [(UINavigationController *)presenting topViewController];
         }
     } else {
-        // We're in a navigation controller so get previous one!
+        // 否则取导航栈里上一个控制器
         if (self.navigationController && self.navigationController.viewControllers.count > 1) {
             presenting = [self.navigationController.viewControllers objectAtIndex:self.navigationController.viewControllers.count-2];
         }
@@ -29,25 +29,21 @@
     }
 }
 
-// If permanent then we don't set timers to hide again
-// Fades all controls on iOS 5 & 6, and iOS 7 controls slide and fade
+/// 设置控件显隐；permanent 为 YES 时不再排自动隐藏定时器
 - (void)setControlsHidden:(BOOL)hidden animated:(BOOL)animated permanent:(BOOL)permanent {
 
-    // Force visible
+    // 无照片 / 网格中 / 常显模式强制可见
     if (![self numberOfPhotos] || _gridController || self.alwaysShowControls)
         hidden = NO;
 
-    // Cancel any timers
+    // 取消待执行的隐藏定时器
     [self cancelControlHiding];
 
-    // Animations & positions
     CGFloat animatonOffset = 20;
     CGFloat animationDuration = (animated ? 0.35 : 0);
 
-    // Status bar
-    // 非 VC based 分支已删除，统一通过 VC 机制更新状态栏显隐，
-    // prefersStatusBarHidden 读取 _statusBarShouldBeHidden，动画样式由
-    // preferredStatusBarUpdateAnimation 指定为 slide，与旧效果一致
+    // 状态栏：统一通过 VC 机制更新显隐，prefersStatusBarHidden 读取 _statusBarShouldBeHidden，
+    // 动画样式由 preferredStatusBarUpdateAnimation 指定为 slide，与旧效果一致
     if (!_leaveStatusBarAlone) {
         _statusBarShouldBeHidden = hidden;
         [UIView animateWithDuration:animationDuration animations:^(void) {
@@ -55,11 +51,9 @@
         } completion:^(BOOL finished) {}];
     }
 
-    // Toolbar and nav bar
-    // Pre-appear animation positions for sliding
+    // 工具栏与导航栏；从隐藏到显示时先把工具栏放到滑入起点
     if ([self areControlsHidden] && !hidden && animated) {
 
-        // Toolbar
         _toolbar.frame = CGRectOffset([self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]], 0, animatonOffset);
 
     }
@@ -67,20 +61,17 @@
 
         CGFloat alpha = hidden ? 0 : 1;
 
-        // Nav bar slides up on it's own on iOS 7+
+        // 导航栏由系统自行滑入，这里只调透明度
         [self.navigationController.navigationBar setAlpha:alpha];
 
-        // Toolbar
-        // 显式 self 消除 block 隐式 retain 警告
+        // 工具栏：显式 self 消除 block 隐式 retain 警告
         self->_toolbar.frame = [self frameForToolbarAtOrientation:[self mw_currentInterfaceOrientation]];
         if (hidden) self->_toolbar.frame = CGRectOffset(self->_toolbar.frame, 0, animatonOffset);
         self->_toolbar.alpha = alpha;
 
     } completion:^(BOOL finished) {}];
 
-    // Control hiding timer
-    // Will cancel existing timer but only begin hiding if
-    // they are visible
+    // 非永久才排自动隐藏
     if (!permanent) [self hideControlsAfterDelay];
 
 }
@@ -102,14 +93,14 @@
 }
 
 - (void)cancelControlHiding {
-    // If a timer exists then cancel and release
+    // 取消并释放现有定时器
     if (_controlVisibilityTimer) {
         [_controlVisibilityTimer invalidate];
         _controlVisibilityTimer = nil;
     }
 }
 
-// Enable/disable control visiblity timer
+/// 排延迟自动隐藏（控件可见时才排）
 - (void)hideControlsAfterDelay {
     if (![self areControlsHidden]) {
         [self cancelControlHiding];
