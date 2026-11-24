@@ -109,15 +109,18 @@
     }];
 }
 
-/// 出场：图片飞回缩略图位置；目标不可用时降级为渐隐
+/// 出场：图片飞回缩略图位置；目标/源视图不可用时降级为渐隐
 - (void)mw_dismiss:(id<UIViewControllerContextTransitioning>)ctx {
     UIView *container = ctx.containerView;
     UIViewController *fromVC = [ctx viewControllerForKey:UITransitionContextFromViewControllerKey];
     UIView *fromView = [ctx viewForKey:UITransitionContextFromViewKey] ?: fromVC.view;
     UIView *target = self.endView;
     UIView *source = self.dismissingImageView;
-    BOOL canZoom = target && target.window && source && source.window && [source isKindOfClass:UIImageView.class] && ((UIImageView *)source).image;
-    if (!canZoom) {
+    // 源视图在窗口内即可飞行；位图缺失（加载中/失败）时用透明占位视图做帧缩放渐隐，
+    // 保证无图页关闭同样有缩回列表的动画，而不是直接渐隐。
+    BOOL hasSourceImage = [source isKindOfClass:UIImageView.class] && ((UIImageView *)source).image;
+    BOOL canFly = target && target.window && source && source.window;
+    if (!canFly) {
         [UIView animateWithDuration:self.duration animations:^{ fromView.alpha = 0; } completion:^(BOOL finished) {
             BOOL completed = !ctx.transitionWasCancelled;
             target.hidden = NO;
@@ -128,9 +131,14 @@
     }
 
     CGRect start = [source convertRect:source.bounds toView:container];
-    CGRect end = [target convertRect:target.bounds toView:container];
-    // 缩小飞回前把飞行图换成目标缩略图的内容模式，使其贴合终点
-    UIImageView *moving = [self mw_imageViewWithImage:((UIImageView *)source).image from:target];
+    CGRect end = target.window ? [target convertRect:target.bounds toView:container] : CGRectMake(CGRectGetMidX(container.bounds) - 12, CGRectGetMidY(container.bounds) - 12, 24, 24);
+    UIImageView *moving;
+    if (hasSourceImage) {
+        // 缩小飞回前把飞行图换成目标缩略图的内容模式，使其贴合终点
+        moving = [self mw_imageViewWithImage:((UIImageView *)source).image from:target];
+    } else {
+        moving = [[UIImageView alloc] init];
+    }
     moving.frame = start;
     [container addSubview:moving];
     UIView *backdrop = [self mw_blackBackdropInContainer:container alpha:1];

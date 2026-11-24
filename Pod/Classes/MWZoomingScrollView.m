@@ -226,6 +226,13 @@
     _loadingIndicator.hidden = YES;
 }
 
+/// 无图且图片未就绪时补显示加载指示器；已有位图或图片已加载则不动。
+- (void)mw_showLoadingIndicatorIfNeeded {
+    if (_photoImageView.image) return;
+    if (_photo && [_photo underlyingImage]) return;
+    [self showLoadingIndicator];
+}
+
 - (void)showLoadingIndicator {
     // UIScrollView 的缩放比例必须为正数；0 会触发
     // _clampedZoomScale:allowRubberbanding: 的系统警告。

@@ -28,6 +28,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)displayImage;
 /// 显示加载失败占位图
 - (void)displayImageFailure;
+/// 当前无位图且未就绪时补显示加载指示器（页面尚未经过 setPhoto 配置时的兜底）
+- (void)mw_showLoadingIndicatorIfNeeded;
 /// 按当前 bounds 计算最大/最小缩放比例
 - (void)setMaxMinZoomScalesForCurrentBounds;
 /// 复用时清理状态

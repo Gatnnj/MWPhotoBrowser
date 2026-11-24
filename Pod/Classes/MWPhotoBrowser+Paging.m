@@ -129,11 +129,29 @@
         MWLog(@"Released underlying image at index %lu", (unsigned long)i);
     }
 
+    // 兜底铺页：程序化跳转（网格选中 / 上一页下一页按钮）与减速停止后不再触发
+    // scrollViewDidScroll，此处确保当前页被创建并绑定，避免黑屏无反馈。
+    if (!_performingLayout) [self tilePages];
+    MWZoomingScrollView *currentPage = [self pageDisplayedAtIndex:index];
+    if (!currentPage) {
+        currentPage = [self dequeueRecycledPage];
+        if (!currentPage) {
+            currentPage = [[MWZoomingScrollView alloc] initWithPhotoBrowser:self];
+        }
+        [_visiblePages addObject:currentPage];
+        [self configurePage:currentPage forIndex:index];
+        [_pagingScrollView addSubview:currentPage];
+    }
+
     // 当前图已就绪时预加载相邻页（后台加载完成后也会回调到此）；
     // 复用本次采样的档位，避免释放窗口与预载窗口读数不一致。
     id <MWPhoto> currentPhoto = [self photoAtIndex:index];
     if ([currentPhoto underlyingImage]) {
         [self loadAdjacentPhotosIfNecessary:currentPhoto preloadCount:preloadCount];
+    } else if (currentPhoto) {
+        // 当前页未就绪：主动触发加载；页面补上加载指示器，避免黑屏无反馈。
+        [currentPhoto loadUnderlyingImageAndNotify];
+        [currentPage mw_showLoadingIndicatorIfNeeded];
     }
 
     // 页码变化时通知代理

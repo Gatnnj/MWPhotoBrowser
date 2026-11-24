@@ -62,7 +62,8 @@
         case UIGestureRecognizerStateBegan: {
             UIView *image = self.currentImageViewBlock ? self.currentImageViewBlock() : nil;
             UIWindow *window = root.window;
-            if (!image || !window || CGRectIsEmpty(image.bounds)) return;
+            // 加载中页的图片视图可能尚未布局（bounds 为零），不能以此拒绝开始
+            if (!image || !window) return;
             self.sourceImageView = image;
             self.overlayWindow = window;
             self.originalHidden = image.hidden;
@@ -71,19 +72,21 @@
             CGPoint imageCenter = [image convertPoint:CGPointMake(CGRectGetMidX(image.bounds), CGRectGetMidY(image.bounds)) toView:root];
             self.touchOffset = CGPointMake(touchPoint.x - imageCenter.x, touchPoint.y - imageCenter.y);
             // 异步刚装上的图用 snapshotViewAfterScreenUpdates: 可能得到空白快照，
-            // 故直接取 UIImage 建拖拽视图，与源视图的 backing layer 和复用生命周期解耦
+            // 故直接取 UIImage 建拖拽视图，与源视图的 backing layer 和复用生命周期解耦。
+            // 无位图（加载中/失败）时不建快照，仅跟手渐隐背景，松手照常判定关闭或回弹。
             UIImage *displayedImage = [image isKindOfClass:[UIImageView class]] ? ((UIImageView *)image).image : nil;
-            if (!displayedImage) break;
-            UIImageView *imageSnapshot = [[UIImageView alloc] initWithImage:displayedImage];
-            // 源视图被外层 scrollView 缩放，屏幕 frame 小于图片原尺寸；复用该 frame 并把位图填进去，
-            // 用 Center 模式会按原像素绘制，拖拽时看起来放大裁切
-            imageSnapshot.contentMode = UIViewContentModeScaleToFill;
-            imageSnapshot.clipsToBounds = image.clipsToBounds;
-            imageSnapshot.backgroundColor = UIColor.clearColor;
-            self.dragSnapshot = imageSnapshot;
-            self.dragSnapshot.frame = self.originalFrame;
-            [window addSubview:self.dragSnapshot];
-            image.hidden = YES;
+            if (displayedImage) {
+                UIImageView *imageSnapshot = [[UIImageView alloc] initWithImage:displayedImage];
+                // 源视图被外层 scrollView 缩放，屏幕 frame 小于图片原尺寸；复用该 frame 并把位图填进去，
+                // 用 Center 模式会按原像素绘制，拖拽时看起来放大裁切
+                imageSnapshot.contentMode = UIViewContentModeScaleToFill;
+                imageSnapshot.clipsToBounds = image.clipsToBounds;
+                imageSnapshot.backgroundColor = UIColor.clearColor;
+                self.dragSnapshot = imageSnapshot;
+                self.dragSnapshot.frame = self.originalFrame;
+                [window addSubview:self.dragSnapshot];
+                image.hidden = YES;
+            }
             UIView *target = self.dismissTargetBlock ? self.dismissTargetBlock() : nil;
             self.dismissTargetView = target;
             self.dismissTargetOriginalHidden = target.hidden;
@@ -96,7 +99,7 @@
             break;
         }
         case UIGestureRecognizerStateChanged: {
-            if (!self.interacting || !self.dragSnapshot) return;
+            if (!self.interacting) return;
             CGFloat height = MAX(root.bounds.size.height, 1);
             CGFloat verticalDistance = ABS(translation.y);
             CGFloat scale = MAX(0.42, 1.0 - verticalDistance / (height * 1.65));
@@ -109,7 +112,7 @@
             frame.size.height *= scale;
             frame.origin = CGPointMake(centerInWindow.x - frame.size.width * 0.5,
                                        centerInWindow.y - frame.size.height * 0.5);
-            self.dragSnapshot.frame = frame;
+            if (self.dragSnapshot) self.dragSnapshot.frame = frame;
             // 两个垂直方向都对称缩放与渐隐
             CGFloat progress = MIN(1, verticalDistance / (height * 0.5));
             CGFloat alpha = pow(1 - progress, 2.0);
@@ -134,56 +137,69 @@
 
 /// 未达关闭阈值：弹簧回弹到原位并恢复层状态
 - (void)mw_restore {
-    UIView *snapshot = self.dragSnapshot;
-    if (!snapshot) return;
     self.interacting = NO;
-    [UIView animateWithDuration:self.restoreDuration delay:0 usingSpringWithDamping:0.86 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-        snapshot.frame = self.originalFrame;
-        if (self.setBackgroundAlpha) self.setBackgroundAlpha(1);
-    } completion:^(BOOL finished) {
+    void (^finishRestore)(void) = ^{
         self.sourceImageView.hidden = self.originalHidden;
         self.dismissTargetView.hidden = self.dismissTargetOriginalHidden;
-        [snapshot removeFromSuperview];
+        if (self.setBackgroundAlpha) self.setBackgroundAlpha(1);
+        if (self.setPagingEnabled) self.setPagingEnabled(YES);
         self.dragSnapshot = nil;
         self.dismissTargetView = nil;
-        if (self.setPagingEnabled) self.setPagingEnabled(YES);
         self.transitionInProgress = NO;
         if (self.interactionDidRestore) self.interactionDidRestore();
-    }];
+    };
+    if (self.dragSnapshot) {
+        UIView *snapshot = self.dragSnapshot;
+        [UIView animateWithDuration:self.restoreDuration delay:0 usingSpringWithDamping:0.86 initialSpringVelocity:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+            snapshot.frame = self.originalFrame;
+        } completion:^(BOOL finished) {
+            [snapshot removeFromSuperview];
+            finishRestore();
+        }];
+    } else {
+        finishRestore();
+    }
 }
 
-/// 达到关闭阈值：快照飞到目标位、透明度归零后回调关闭
+/// 达到关闭阈值：快照飞到目标位、透明度归零后回调关闭；无快照时仅渐隐关闭
 - (void)mw_finishDismiss {
-    UIView *snapshot = self.dragSnapshot;
     UIWindow *window = self.overlayWindow;
     UIView *root = self.rootView;
     UIView *target = self.dismissTargetView ?: (self.dismissTargetBlock ? self.dismissTargetBlock() : nil);
-    if (!snapshot || !window || !root) {
+    self.interacting = NO;
+    if (!window || !root) {
         target.hidden = self.dismissTargetOriginalHidden;
         self.dismissTargetView = nil;
         if (self.dismissBlock) self.dismissBlock();
         return;
     }
-    self.interacting = NO;
-    CGRect endFrame = target.window ? [target convertRect:target.bounds toView:window] : CGRectMake(CGRectGetMidX(window.bounds) - 12, CGRectGetMidY(window.bounds) - 12, 24, 24);
-    [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
-        snapshot.frame = endFrame;
+    if (self.dragSnapshot) {
+        UIView *snapshot = self.dragSnapshot;
+        CGRect endFrame = target.window ? [target convertRect:target.bounds toView:window] : CGRectMake(CGRectGetMidX(window.bounds) - 12, CGRectGetMidY(window.bounds) - 12, 24, 24);
+        [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+            snapshot.frame = endFrame;
+            if (self.setBackgroundAlpha) self.setBackgroundAlpha(0);
+        } completion:^(BOOL finished) {
+            [snapshot removeFromSuperview];
+            self.dragSnapshot = nil;
+            // 快照落位的同帧恢复真实封面；dismissBlock 执行前浏览器仍盖住列表
+            target.hidden = self.dismissTargetOriginalHidden;
+            self.dismissTargetView = nil;
+            if (self.dismissBlock) self.dismissBlock();
+        }];
+    } else {
         if (self.setBackgroundAlpha) self.setBackgroundAlpha(0);
-    } completion:^(BOOL finished) {
-        [snapshot removeFromSuperview];
-        self.dragSnapshot = nil;
-        // 快照落位的同帧恢复真实封面；dismissBlock 执行前浏览器仍盖住列表
         target.hidden = self.dismissTargetOriginalHidden;
         self.dismissTargetView = nil;
         if (self.dismissBlock) self.dismissBlock();
-    }];
+    }
 }
 
 - (BOOL)gestureRecognizerShouldBegin:(UIPanGestureRecognizer *)gesture {
     UIView *image = self.currentImageViewBlock ? self.currentImageViewBlock() : nil;
-    // 网络图还在加载时 UIImageView 已存在但无图，此时启动会拖一个黑色占位，
-    // 故等真实图片就绪；且要求以纵向速度为主
-    if (![image isKindOfClass:[UIImageView class]] || !image.window || !((UIImageView *)image).image) return NO;
+    // 加载中/失败页 UIImageView 无图也允许开始：拖拽只跟手渐隐，不建快照；
+    // 仅要求视图在窗口内，并以纵向速度为主。
+    if (![image isKindOfClass:[UIImageView class]] || !image.window) return NO;
     CGPoint velocity = [gesture velocityInView:gesture.view];
     return fabs(velocity.y) > fabs(velocity.x) * 1.15;
 }
