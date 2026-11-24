@@ -36,7 +36,9 @@ let package = Package(
             sources: ["Classes"],
             resources: [
                 // .process 才会走 actool 编成 Assets.car；用 .copy 会原样拷贝导致 imageNamed:inBundle: 取不到图
-                .process("Assets/MWPhotoBrowser.xcassets")
+                .process("Assets/MWPhotoBrowser.xcassets"),
+                // 隐私清单无需编译，.copy 原样放进 bundle，与 Assets.car 同级
+                .copy("Assets/PrivacyInfo.xcprivacy")
             ],
             // 默认是 include/，本库 .h/.m 混排在 Classes 下，必须显式指定，否则头文件对外不可见
             publicHeadersPath: "Classes",

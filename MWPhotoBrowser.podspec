@@ -25,7 +25,7 @@ Pod::Spec.new do |s|
   # 好处是只保留一份源文件、自动匹配 @1x/@2x/@3x、支持 App Thinning / Dark Mode，
   # 并且资源名被限定在库自己的 bundle 里，不会和宿主 app 的同名图片冲突。
   s.resource_bundles = {
-    'MWPhotoBrowser' => ['Pod/Assets/*.xcassets']
+    'MWPhotoBrowser' => ['Pod/Assets/*.xcassets', 'Pod/Assets/PrivacyInfo.xcprivacy']
   }
   s.requires_arc = true
   s.frameworks = 'ImageIO', 'QuartzCore', 'Photos'
