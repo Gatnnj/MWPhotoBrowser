@@ -8,6 +8,16 @@ forked from [mwaterfall/MWPhotoBrowser](https://github.com/mwaterfall/MWPhotoBro
 
 ### 提交**记录**
 
+### Version 3.2.0
+
+> 2026年11月24日
+
+- 提交v3.2.0版本
+- 优化转场动画，增加MWToolBar可自定义frame
+- 优化加载网络图片资源和转场UI交互
+
+
+
 ### Version 3.1.0
 
 > 2026年11月23日
@@ -34,10 +44,10 @@ MWPhotoBrowser 同时支持 **CocoaPods** 与 **Swift Package Manager**，两种
 ### CocoaPods
 
 ```ruby
-pod 'MWPhotoBrowser', :git => 'https://github.com/Gatnnj/MWPhotoBrowser.git', :branch => 'develop'
+pod 'MWPhotoBrowser', :git => 'https://github.com/Gatnnj/MWPhotoBrowser.git'
 ```
 
-版本 tag 发布后也可写 `pod 'MWPhotoBrowser', '~> 3.1.0'`。
+
 
 ### Swift Package Manager
 
@@ -51,8 +61,7 @@ https://github.com/Gatnnj/MWPhotoBrowser.git
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Gatnnj/MWPhotoBrowser.git", branch: "develop")
-    // 版本 tag 发布后可改为 from: "3.1.0"
+    .package(url: "https://github.com/Gatnnj/MWPhotoBrowser.git")
 ]
 ```
 

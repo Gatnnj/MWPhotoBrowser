@@ -1,14 +1,12 @@
 Pod::Spec.new do |s|
 
   s.name = 'MWPhotoBrowser'
-  s.version = '3.1.0'
+  s.version = '3.2.0'
   s.license = 'MIT'
-  s.summary = 'A simple iOS photo browser with optional grid view, captions and selections.'
+  s.summary = '一个经过重生的iOS图片浏览器，最低支持iOS15.0'
   s.description = <<-DESCRIPTION
-                  MWPhotoBrowser can display one or more images by providing UIImage objects,
-                  PHAsset objects, or URLs to library assets, web images or local files.
-                  The photo browser handles the downloading and caching of photos from the web seamlessly.
-                  Photos can be zoomed and panned, and optional (customisable) captions can be displayed.
+                  MWPhotoBrowser 经过涅槃重生，适配了最低iOS15.0，并且增加拖拽交互关闭，优化了展示缩略图内存，按可用剩余内存预加载。
+                  增加文档开关模糊展示图片。
                   DESCRIPTION
 
   s.homepage = 'https://github.com/Gatnnj/MWPhotoBrowser.git'
